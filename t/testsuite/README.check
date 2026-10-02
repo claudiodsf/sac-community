@@ -78,7 +78,7 @@ If the test contains extra data or is a executes a macro command
 
 If the command is new and requires knowledge of a different SACAUX
 
-  % setenv SACAUX "/new/path/to/sac/aux"
+  % setenv SACAUX "/new/path/to/sac/sacaux"
   % cd t/testsuite
   % ../pytest.py -r input/mukluk
      # Check the output

@@ -16,7 +16,7 @@
 # Initialize the SAC Environment (only SACHOME may need to be changed)
 setenv SACHOME __SAC_PREFIX__
 setenv PATH ${PATH}:${SACHOME}/bin
-setenv SACAUX ${SACHOME}/aux
+setenv SACAUX ${SACHOME}/sacaux
 
 # Uncomment the desired options below to change from the default and
 # comment out the default option

@@ -2,14 +2,14 @@
 AUTOMAKE_OPTIONS = no-dependencies #dejagnu
 
 if X11_APP
-TESTS_ENVIRONMENT = SACAUX=$(abs_top_srcdir)/aux \
+TESTS_ENVIRONMENT = SACAUX=$(abs_top_srcdir)/sacaux \
 	SACBIN=../src/sac \
 	ABS_TOP_SRCDIR=$(abs_top_srcdir) \
 	ABS_BUILDDIR=$(abs_builddir)
 SACBIN=../src/sac
 endif
 if OSX_APP
-TESTS_ENVIRONMENT = SACAUX=$(abs_top_srcdir)/aux \
+TESTS_ENVIRONMENT = SACAUX=$(abs_top_srcdir)/sacaux \
 	SACBIN=../Sac.app/Contents/MacOS/sac-osx-gui \
 	ABS_TOP_SRCDIR=$(abs_top_srcdir) \
 	ABS_BUILDDIR=$(abs_builddir)

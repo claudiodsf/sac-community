@@ -736,12 +736,12 @@ zlib_LIBS = @zlib_LIBS@
 
 # Do not create dependencides while compiling
 AUTOMAKE_OPTIONS = no-dependencies #dejagnu
-@OSX_APP_TRUE@TESTS_ENVIRONMENT = SACAUX=$(abs_top_srcdir)/aux \
+@OSX_APP_TRUE@TESTS_ENVIRONMENT = SACAUX=$(abs_top_srcdir)/sacaux \
 @OSX_APP_TRUE@	SACBIN=../Sac.app/Contents/MacOS/sac-osx-gui \
 @OSX_APP_TRUE@	ABS_TOP_SRCDIR=$(abs_top_srcdir) \
 @OSX_APP_TRUE@	ABS_BUILDDIR=$(abs_builddir)
 
-@X11_APP_TRUE@TESTS_ENVIRONMENT = SACAUX=$(abs_top_srcdir)/aux \
+@X11_APP_TRUE@TESTS_ENVIRONMENT = SACAUX=$(abs_top_srcdir)/sacaux \
 @X11_APP_TRUE@	SACBIN=../src/sac \
 @X11_APP_TRUE@	ABS_TOP_SRCDIR=$(abs_top_srcdir) \
 @X11_APP_TRUE@	ABS_BUILDDIR=$(abs_builddir)

@@ -18,7 +18,7 @@ Requirements
 
 Building
 --------
-From the base directory (with aux and HISTORY files), run
+From the base directory (with sacaux and HISTORY files), run
 
   A:\>%cd%\win\build_win.bat
 
@@ -31,7 +31,7 @@ The errors and warnings will be collected into errors.txt and warnings.txt
 
 Cleaning
 --------
-From the base directory (with aux and HISTORY files), run
+From the base directory (with sacaux and HISTORY files), run
 
   A:\>%cd%\win\build_win.bat
 

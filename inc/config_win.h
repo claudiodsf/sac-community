@@ -25,7 +25,7 @@
 #define COMPLEX_STRUCT_DEFINED 1
 #define F_OK 0
 
-#define SACAUX "C:\\Program Files\\Sac\\winaux"
+#define SACAUX "C:\\Program Files\\Sac\\sacaux"
 
 #define PACKAGE_BUGREPORT "https://github.com/earthscope/sac-community"
 #define BUILD_DATE        "09/21/2026"

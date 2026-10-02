@@ -1,6 +1,6 @@
 
 LINKS="../links/commands_links.txt"
-FILES="../aux/help/*"
+FILES="../sacaux/help/*"
 DIR="html/commands"
 TEMPLATE="../tmpl/template_commands.txt "
 CSS="../css/html2css1.css"

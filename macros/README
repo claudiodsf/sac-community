@@ -13,8 +13,8 @@ now other suites of macros and programs that serve this purpose.
 These include:
 
 1. SAC Community Edition Example Program (sac/doc/examples/README)
-2. Help files: sac/auc/help/user_man/macros; sac/aux/help/cut; and
-   sac/aux/help/cutim
+2. Help files: sac/sacaux/help/user_man/macros; sac/sacaux/help/cut; and
+   sac/sacaux/help/cutim
 3. sac/t/testsuite/README.check (currently available only with the
    source distribution)
 

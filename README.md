@@ -44,7 +44,7 @@ xattr -dr com.apple.quarantine /path/to/sac
 
 `SACHOME`: This must be set so that SAC can be found on the computer. The default when SAC is installed from sources is `/usr/local/sac/`.
 
-SAC needs to be able to find auxillary (`${SACHOME}/aux/`) data that are installed along side the executable / binary program.  SAC will attempt to find these data using
+SAC needs to be able to find auxillary (`${SACHOME}/sacaux/`) data that are installed along side the executable / binary program.  SAC will attempt to find these data using
 
 1. the `SACAUX` environmental variable
 2. the default install location

@@ -37,7 +37,7 @@ Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescrip
 
 [Files]
 Source: "src\sac.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: "winaux\*"; DestDir: "{app}/winaux"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "sacaux\*"; DestDir: "{app}/sacaux"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

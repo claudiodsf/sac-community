@@ -1,6 +1,6 @@
 
 LINKS="../../links/spe_links.txt"
-FILES="../aux/help/spe_dir/*"
+FILES="../sacaux/help/spe_dir/*"
 DIR="html/commands/spe.com/"
 TEMPLATE="../../tmpl/template_spe.txt "
 CSS="../../css/html2css1.css"

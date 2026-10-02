@@ -3,7 +3,7 @@ set MyConfig=Release
 set MSBuild="C:\Program Files\MSBuild\12.0\Bin\MSBuild.exe"
 REM set MSBuild="C:\Program Files\Microsoft Visual Studio\2017\Community\MSBuild\15.0\Bin\MSBuild.exe"
 set InnoSetup="C:\Program Files\Inno Setup 5\ISCC"
-set Winaux=win\%MyConfig%\winaux
+set Sacaux=win\%MyConfig%\sacaux
 
 
 REM Create config.h
@@ -18,14 +18,14 @@ echo %ERRORLEVEL%
 
 del inc\config.h
 
-REM Copy AUX to WINAUX
+REM Copy SACAUX to the build directory
 
-rmdir %Winaux% /s /q
-mkdir %Winaux%
-copy aux\* %Winaux%
+rmdir %Sacaux% /s /q
+mkdir %Sacaux%
+copy sacaux\* %Sacaux%
 FOR %%A in ( ctables datagen external fir fonts help macros mat tables ) DO (
-    mkdir %Winaux%\%%A
-    xcopy aux\%%A %Winaux%\%%A /e
+    mkdir %Sacaux%\%%A
+    xcopy sacaux\%%A %Sacaux%\%%A /e
 )
 
 REM Create Installer

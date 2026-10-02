@@ -1,5 +1,5 @@
 
-FILES="../aux/help/user_man/*"
+FILES="../sacaux/help/user_man/*"
 LINKS="../links/manual_links.txt"
 DIR="html/manual"
 TEMPLATE="../tmpl/template_manual.txt "

@@ -50,7 +50,6 @@ AC_SUBST([BINARY_DIST])
 BINARY_DIST=""
 
 display=x11
-winaux=off
 
 AC_MSG_NOTICE([Host $host])
 
@@ -119,10 +118,6 @@ case "${host}" in
                                      MATLAB_EXE_PATH="bin/matlab"
                                      AC_MSG_CHECKING([for Cygwin version])
                                      OSRELEASE=`uname -r`
-                                     case "${OSRELEASE}" in
-                                          *1.[[135]]*) winaux=on
-                                          ;;
-                                     esac
 		                     AC_MSG_RESULT( $OSRELEASE )
      ;;
      *mingw* )                       AC_DEFINE([MINGW], [1], [Minimalist GNU for Windows])
@@ -136,10 +131,6 @@ case "${host}" in
                                      AC_DEFINE([WIN_APP], [1], [Create Windows Application])
                                      display=win
 				     OSRELEASE=`uname -r`
-				     case "${OSRELEASE}" in
-				       *1.* ) winaux=on
-     ;;
-     esac
      AC_MSG_RESULT( $OSRELEASE )
      OBJEXT=o
 
@@ -147,7 +138,6 @@ case "${host}" in
 esac
 
 AM_CONDITIONAL([CYGWIN_SYSTEM], [ test x${BINARY_DIST} = xwin32 ])
-AM_CONDITIONAL([WINAUX_NOT_AUX], [ test x${winaux} = on ] )
 
 # C Compiler
 # Autoconf 2.72+ appends -std=gnu23 when the compiler needs a flag for it;
@@ -270,11 +260,11 @@ AC_DEFINE_UNQUOTED([BUILD_DATE], ["`date +%Y-%m-%d`"], [Macro which defines the 
 
 # Define the Install Directory
 if [ test "x$prefix" = xNONE ]; then
-   aux="${ac_default_prefix}/aux"
+   sacaux_dir="${ac_default_prefix}/sacaux"
 else
-   aux="${prefix}/aux"
+   sacaux_dir="${prefix}/sacaux"
 fi
-AC_DEFINE_UNQUOTED([SACAUX], ["${aux}"], [Define the SACAUX directory])
+AC_DEFINE_UNQUOTED([SACAUX], ["${sacaux_dir}"], [Define the SACAUX directory])
 
 # Output the Makefiles
 AC_CONFIG_FILES([src/Makefile

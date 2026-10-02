@@ -1,6 +1,6 @@
 
 LINKS="../../links/sss_links.txt"
-FILES="../aux/help/sss_dir/*"
+FILES="../sacaux/help/sss_dir/*"
 DIR="html/commands/sss.com/"
 TEMPLATE="../../tmpl/template_sss.txt "
 CSS="../../css/html2css1.css"

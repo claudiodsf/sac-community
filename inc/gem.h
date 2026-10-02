@@ -83,7 +83,7 @@ enum {
 
 enum {
     LINE_STYLE_SOLID = 1,
-    LINE_STYLE_DOTTED = 8,      /* Corresponds to 8th line in aux/linestyles.txt */
+    LINE_STYLE_DOTTED = 8,      /* Corresponds to 8th line in sacaux/linestyles.txt */
 };
 
 #define LINE_WIDTH_THIN  1

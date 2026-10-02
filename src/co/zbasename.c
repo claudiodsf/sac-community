@@ -22,19 +22,19 @@
 #endif
 
 char *aux_tries[] = {
-    "/usr/local/sac/aux/messages",
-    "/usr/sac/aux/messages",
-    "/opt/local/sac/aux/messages",
-    "/opt/sac/aux/messages",
+    "/usr/local/sac/sacaux/messages",
+    "/usr/sac/sacaux/messages",
+    "/opt/local/sac/sacaux/messages",
+    "/opt/sac/sacaux/messages",
     NULL,
 };
 
 #define SET_VAR \
     "  To set the SACAUX enviornment variable:\n" \
     "  - For sh like shells:\n" \
-    "    export SACAUX=/usr/local/sac/aux\n" \
+    "    export SACAUX=/usr/local/sac/sacaux\n" \
     "  - For csh like shells:\n" \
-    "     setenv SACAUX /usr/local/sac/aux\n" \
+    "     setenv SACAUX /usr/local/sac/sacaux\n" \
     "\n" \
     "  Consult the README file for setting up SAC for more details\n" 
 
@@ -119,7 +119,7 @@ sacaux() {
     *p = 0;
     //p = rindex(wintemp,'/');
     //*p = 0;
-    strncat(wintemp, "/winaux", 7);
+    strncat(wintemp, "/sacaux", 7);
     return strdup(wintemp);
 }
 

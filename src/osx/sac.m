@@ -70,7 +70,7 @@ void sac_create_window(void *id, int n) {
   char **argv;
 
   /* Create SACAUX from variable name*/
-  aux = [[NSBundle mainBundle] pathForResource: @"aux" ofType: nil];
+  aux = [[NSBundle mainBundle] pathForResource: @"sacaux" ofType: nil];
   setenv("SACAUX", [aux UTF8String], 1);
   
   /* Convert arguments into argc,argv */

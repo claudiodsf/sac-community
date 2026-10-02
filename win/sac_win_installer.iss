@@ -37,7 +37,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: ".\{#MyConfig}\sac.exe"; DestDir: "{app}"; Flags: ignoreversion
-Source: ".\{#MyConfig}\winaux\*"; DestDir: "{app}\winaux"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: ".\{#MyConfig}\sacaux\*"; DestDir: "{app}\sacaux"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Icons]

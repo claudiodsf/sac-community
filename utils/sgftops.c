@@ -11,7 +11,7 @@
  * MODIFICATION HISTORY:
  *  201305:   Arthur and Brian changed base_width from 15 to 40 to maatch
               output linewidths from savimg ps or pdf files.
- *  201206:               changed linestyles to match aux/linestyles.txt
+ *  201206:               changed linestyles to match sacaux/linestyles.txt
  *  201205:               cleaned up code
  *  20100614:  rwg@vt.edu fixed a bug related to the "move" command (values
  *             of x and y were not saved between calls to execute_buffer)

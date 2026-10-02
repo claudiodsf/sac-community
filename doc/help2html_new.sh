@@ -29,10 +29,10 @@ function usage {
     echo "Usage: help2html.sh [-pdf] [all | file]"
     echo ""
     echo "       Convert SAC help files to html files "
-    echo "       all  - Convert everything from the aux/help directory"
+    echo "       all  - Convert everything from the sacaux/help directory"
     echo "       file - Convert a single help file"
     echo "              Replace file with relative path from this directory"
-    echo "              Example: for fft, file would be ../aux/help/fft"
+    echo "              Example: for fft, file would be ../sacaux/help/fft"
     echo "       -pdf  Convert all of file(s) instead to TeX format"
     echo "       "      
 }
@@ -186,7 +186,7 @@ function everything {
 FORMAT="html"
 
 if [ $# -ne $NO_ARGS ]; then
-    HELP="../aux/help/"
+    HELP="../sacaux/help/"
     for arg in $* ; do
         if [ x"all" == x"$arg" ]; then
             everything

@@ -128,7 +128,7 @@ distribution.  On a dual 32/64-bit system, ensure configure links the
 
 * Creating the documentation
 -------------------------------------------------------------------------
-Help text lives under aux/help/ as reStructuredText.  From doc/, it can be
+Help text lives under sacaux/help/ as reStructuredText.  From doc/, it can be
 converted to a set of HTML pages and/or a single PDF manual.  This is a
 manual developer/release step; it is not run by configure, make, or
 make install.
@@ -144,9 +144,9 @@ To build the HTML pages:
 % ./help2html_new.sh all
 
 This writes pages under doc/html/ (and doc/html/commands/, doc/html/manual/,
-and so on), mirroring the aux/help/ layout.  To rebuild a single page
+and so on), mirroring the sacaux/help/ layout.  To rebuild a single page
 instead of everything, pass its path relative to doc/, for example
-../aux/help/fft.
+../sacaux/help/fft.
 
 To build the PDF manual:
 

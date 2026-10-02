@@ -7,14 +7,10 @@ AUTOMAKE_OPTIONS = no-dependencies
 # Subdirectories to MAKE recursively
 SUBDIRS          = libmseed evalresp fern sacio src utils t
 
-SACAUX_WIN       = winaux
-SACAUX_UNIX      = aux
-
-if WINAUX_NOT_AUX
-SACAUX_DIR       = $(SACAUX_WIN)
-else
-SACAUX_DIR       = $(SACAUX_UNIX)
-endif
+# Name of the SAC auxiliary data directory.  A single name is used on every
+# platform: "aux" cannot be used because it is a reserved DOS device name,
+# which Windows does not allow as a directory name.
+SACAUX_DIR       = sacaux
 
 EXTRA_ALWAYS = CHANGES Editline.license HISTORY License README.md 
 
@@ -121,16 +117,11 @@ dist-hook:
 	test ! -d $(distdir) || rm -rf `find $(distdir) -name CVS -type d `
 	test ! -d $(distdir)/inc || rm -rf `find $(distdir)/inc -name config.h  `
 
+# Cygwin source distribution.
+# This used to rename the aux directory to "winaux" because "aux" is not a
+# valid directory name on Windows.  The tree now ships a single "sacaux" name
+# on every platform, so the distribution can be shipped as-is.
 dist-cygwin: distdir
-	test -d $(distdir) 
-	test -d $(distdir)/$(SACAUX_UNIX)
-	mv $(distdir)/$(SACAUX_UNIX) $(distdir)/$(SACAUX_WIN)
-	$(SED) 's/SACAUX_UNIX = aux/SACAUX_UNIX = winaux/' $(distdir)/Makefile.in > $(distdir)/Makefile.in.new
-	mv $(distdir)/Makefile.in.new $(distdir)/Makefile.in
-	$(SED) 's/aux/winaux/' $(distdir)/bin/sacinit.sh.in  > $(distdir)/bin/sacinit.sh.in.new
-	mv $(distdir)/bin/sacinit.sh.in.new $(distdir)/bin/sacinit.sh.in
-	$(SED) 's/aux/winaux/' $(distdir)/bin/sacinit.csh.in > $(distdir)/bin/sacinit.csh.in.new
-	mv $(distdir)/bin/sacinit.csh.in.new $(distdir)/bin/sacinit.csh.in
 	tardir=$(distdir) && $(am__tar) | GZIP=$(GZIP_ENV) gzip -c >$(distdir)-cygwin.tar.gz
 	$(am__remove_distdir)
 
@@ -156,7 +147,7 @@ Sacapp:
 	@echo " CREATE " Sac.app
 	rm -rf Sac.app
 	cp -fpR $(abs_top_srcdir)/src/osx/Sac.app .
-	cp -fpR $(abs_top_srcdir)/aux Sac.app/Contents/Resources
+	cp -fpR $(abs_top_srcdir)/$(SACAUX_DIR) Sac.app/Contents/Resources
 	mkdir $(SACAPP_RSC)/doc
 	cp -fpR $(abs_top_srcdir)/doc/README $(SACAPP_RSC)/doc
 	cp -fpR $(abs_top_srcdir)/doc/examples $(SACAPP_RSC)/doc

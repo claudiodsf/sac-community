@@ -1,6 +1,6 @@
 
 LINKS="links/index_links.txt"
-FILES="../aux/help/index/*"
+FILES="../sacaux/help/index/*"
 DIR="html/"
 TEMPLATE="tmpl/template_index.txt "
 CSS="css/html2css1.css"

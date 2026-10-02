@@ -684,8 +684,6 @@ CPPFLAGS
 LDFLAGS
 CFLAGS
 CC
-WINAUX_NOT_AUX_FALSE
-WINAUX_NOT_AUX_TRUE
 CYGWIN_SYSTEM_FALSE
 CYGWIN_SYSTEM_TRUE
 BINARY_DIST
@@ -4270,7 +4268,6 @@ fi
 BINARY_DIST=""
 
 display=x11
-winaux=off
 
 { printf '%s\n' "$as_me:${as_lineno-$LINENO}: Host $host" >&5
 printf '%s\n' "$as_me: Host $host" >&6;}
@@ -4361,10 +4358,6 @@ printf '%s\n' "#define CYGWIN 1" >>confdefs.h
                                      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: checking for Cygwin version" >&5
 printf %s "checking for Cygwin version... " >&6; }
                                      OSRELEASE=`uname -r`
-                                     case "${OSRELEASE}" in
-                                          *1.[135]*) winaux=on
-                                          ;;
-                                     esac
 		                     { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: $OSRELEASE " >&5
 printf '%s\n' "$OSRELEASE " >&6; }
      ;;
@@ -4384,10 +4377,6 @@ printf '%s\n' "#define WIN_APP 1" >>confdefs.h
 
                                      display=win
 				     OSRELEASE=`uname -r`
-				     case "${OSRELEASE}" in
-				       *1.* ) winaux=on
-     ;;
-     esac
      { printf '%s\n' "$as_me:${as_lineno-$LINENO}: result: $OSRELEASE " >&5
 printf '%s\n' "$OSRELEASE " >&6; }
      OBJEXT=o
@@ -4401,14 +4390,6 @@ esac
 else
   CYGWIN_SYSTEM_TRUE='#'
   CYGWIN_SYSTEM_FALSE=
-fi
-
- if  test x${winaux} = on  ; then
-  WINAUX_NOT_AUX_TRUE=
-  WINAUX_NOT_AUX_FALSE='#'
-else
-  WINAUX_NOT_AUX_TRUE='#'
-  WINAUX_NOT_AUX_FALSE=
 fi
 
 
@@ -10355,13 +10336,13 @@ _ACEOF
 
 # Define the Install Directory
 if  test "x$prefix" = xNONE ; then
-   aux="${ac_default_prefix}/aux"
+   sacaux_dir="${ac_default_prefix}/sacaux"
 else
-   aux="${prefix}/aux"
+   sacaux_dir="${prefix}/sacaux"
 fi
 
 cat >>confdefs.h <<_ACEOF
-#define SACAUX "${aux}"
+#define SACAUX "${sacaux_dir}"
 _ACEOF
 
 
@@ -10474,10 +10455,6 @@ fi
 
 if test -z "${CYGWIN_SYSTEM_TRUE}" && test -z "${CYGWIN_SYSTEM_FALSE}"; then
   as_fn_error $? "conditional \"CYGWIN_SYSTEM\" was never defined.
-Usually this means the macro was only invoked conditionally." "$LINENO" 5
-fi
-if test -z "${WINAUX_NOT_AUX_TRUE}" && test -z "${WINAUX_NOT_AUX_FALSE}"; then
-  as_fn_error $? "conditional \"WINAUX_NOT_AUX\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${X11_APP_TRUE}" && test -z "${X11_APP_FALSE}"; then
