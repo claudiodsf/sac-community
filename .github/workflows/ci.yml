@@ -1,0 +1,131 @@
+name: CI
+
+# Build and test SAC on Linux and macOS.
+#
+# Runs on every push that changes something that can affect the build or the
+# tests, and on every pull request.  Pushes that only touch documentation
+# (README, CHANGES, HISTORY, doc/, ...) are skipped: see paths-ignore below.
+on:
+  push:
+    branches: [ "**" ]
+    paths-ignore:
+      - '**.md'
+      - 'README*'
+      - 'Readme*'
+      - 'CHANGES'
+      - 'HISTORY'
+      - 'License'
+      - 'linenoise.license'
+      - 'doc/**'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'README*'
+      - 'Readme*'
+      - 'CHANGES'
+      - 'HISTORY'
+      - 'License'
+      - 'linenoise.license'
+      - 'doc/**'
+  workflow_dispatch: # Allow running the workflow manually
+
+concurrency:
+  # A push to a branch and its pull request share the same group, so an
+  # in-progress run is cancelled when the branch is updated.
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.runs-on }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: linux-x86_64
+            runs-on: ubuntu-24.04
+          - name: linux-arm64
+            runs-on: ubuntu-24.04-arm
+          - name: macos-arm64
+            runs-on: macos-latest
+          - name: macos-x86_64
+            runs-on: macos-15-intel
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v5
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxml2-dev libxpm-dev libx11-dev libcurl4-openssl-dev xvfb
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install --cask xquartz
+          {
+            echo "PKG_CONFIG_PATH=/opt/X11/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+            echo "CONFIGURE_X_FLAGS=--x-includes=/opt/X11/include --x-libraries=/opt/X11/lib"
+            echo "CONFIGURE_CURL_FLAGS=--with-libcurl=/usr"
+          } >> "$GITHUB_ENV"
+      - name: Create build directory
+        run: mkdir build
+      - name: Configure
+        working-directory: ./build
+        run: |
+          # CONFIGURE_X_FLAGS and CONFIGURE_CURL_FLAGS are left unquoted on
+          # purpose: each expands to two separate configure arguments.
+          # shellcheck disable=SC2086
+          ../configure --enable-optim=2 $CONFIGURE_X_FLAGS $CONFIGURE_CURL_FLAGS
+      - name: Compile
+        working-directory: ./build
+        run: make
+      - name: Test (Linux)
+        if: runner.os == 'Linux'
+        timeout-minutes: 20
+        working-directory: ./build
+        run: xvfb-run -a make check
+      - name: Test (macOS)
+        if: runner.os == 'macOS'
+        timeout-minutes: 30
+        working-directory: ./build
+        run: |
+          # XQuartz ships Xvfb. It refuses to create /tmp/.X11-unix itself
+          # (it must be root-owned), so prepare it first.
+          sudo mkdir -p /tmp/.X11-unix
+          sudo chown root:wheel /tmp/.X11-unix
+          sudo chmod 1777 /tmp/.X11-unix
+          # -noreset keeps the X server from resetting (and briefly refusing
+          # connections) when the last client disconnects.  The X11 device
+          # tests close and reopen the display in a tight loop, which can
+          # otherwise make a reconnect fail with SAC error 203.
+          /opt/X11/bin/Xvfb :99 -screen 0 1280x1024x24 -noreset -nolisten tcp \
+            >"$RUNNER_TEMP/xvfb.log" 2>&1 &
+          for _ in {1..30}; do
+            if [ -S /tmp/.X11-unix/X99 ]; then break; fi
+            sleep 1
+          done
+          if [ ! -S /tmp/.X11-unix/X99 ]; then
+            echo "::error::Xvfb did not start on display :99"
+            cat "$RUNNER_TEMP/xvfb.log" || true
+            exit 1
+          fi
+          export DISPLAY=:99
+          # The X11 device tests depend on the X server's timing and can flake
+          # under a virtual server; re-run only the failed tests once.  A real
+          # regression fails again here.
+          make check || {
+            echo "::warning::make check failed; re-running the failed tests"
+            make -C t recheck
+          }
+      - name: Show test log
+        if: failure()
+        working-directory: ./build
+        run: cat t/test-suite.log || true
+      - name: Show Xvfb log
+        if: failure() && runner.os == 'macOS'
+        run: cat "$RUNNER_TEMP/xvfb.log" || true
