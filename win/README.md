@@ -98,6 +98,29 @@ installation. Only `libc++` is shipped alongside, since MSYS2 builds it as a
 DLL and the compiler's implicit `-lc++` cannot be redirected to the static
 archive.
 
+## Tests
+
+The `t/` testsuite is registered with CTest. Each `.sm` test is a SAC command
+script, which `t/pytest.py` feeds to `sac.exe` and compares against the expected
+output in `t/testsuite/output/`. The fixtures that the autotools build stages
+with `t/copy_files.sh` are copied into `<build>/t/` when CMake runs, so the tests
+can be run straight from the build tree:
+
+```sh
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+The list of tests is read out of `t/Makefile.am`, so the autotools and CMake
+builds cannot drift apart: tests that upstream has disabled stay disabled, and
+a new test is picked up automatically. Python 3 is needed to configure the
+tests; without it they are simply not registered.
+
+The tests that drive the X11 device directly (`begindevices`, `report`,
+`enddevices`) are skipped, since Windows has its own graphics backend in
+`src/win/`. They are listed in `SAC_TESTS_DISABLED` in `CMakeLists.txt`.
+
 ## Build options
 
 | Option | Default | Meaning |

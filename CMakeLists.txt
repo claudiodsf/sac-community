@@ -169,8 +169,15 @@ function(sac_patch_component component)
 
     foreach(_patch ${ARGN})
         set(_patch_file "${PROJECT_SOURCE_DIR}/win/patches/${_patch}")
+        # The patches are stored with LF, but on Windows the working tree is
+        # usually checked out with CRLF (git's default there), and then "git
+        # apply" only matches the context if it is told to consider the CRLF
+        # part of the line ending.  -c core.autocrlf=true does that, and makes
+        # the result independent of the user's own core.autocrlf setting --
+        # which is what made the CI build fail, because there the MSYS2 git
+        # found by find_package(Git) runs with autocrlf unset.
         execute_process(
-            COMMAND "${GIT_EXECUTABLE}" apply -p1
+            COMMAND "${GIT_EXECUTABLE}" -c core.autocrlf=true apply -p1
                     --directory=${SAC_PATCH_REL}
                     --whitespace=nowarn "${_patch_file}"
             WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
@@ -471,3 +478,81 @@ add_custom_target(dist
     DEPENDS ${SAC_DIST_DEPENDS}
     COMMENT "Assembling ${SAC_DIST_NAME}.zip"
     VERBATIM)
+
+# ---------------------------------------------------------------------------
+# Tests
+#
+# The test suite lives in t/ and is driven by t/pytest.py: each .sm file is a
+# SAC command script which is fed to sac, and its stdout/stderr are compared
+# with t/testsuite/output/<name>.{out,err}.  The test list is read out of
+# t/Makefile.am so that the autotools and CMake builds cannot drift, and the
+# fixtures t/copy_files.sh stages before `make check` are staged here too.
+#
+# Windows has its own graphics backend (src/win/), so the tests that drive the
+# X11 device directly are skipped; see SAC_TESTS_REQUIRING_X11 below.
+# ---------------------------------------------------------------------------
+include(CTest)
+
+if(BUILD_TESTING)
+    find_package(Python3 COMPONENTS Interpreter QUIET)
+
+    if(NOT Python3_Interpreter_FOUND)
+        message(WARNING
+            "Python 3 was not found, so the t/ testsuite is not registered "
+            "with CTest.  Install Python and re-run CMake to enable it.")
+    else()
+        set(SAC_TEST_DIR "${CMAKE_BINARY_DIR}/t")
+
+        # Mirrors t/copy_files.sh: input/ and output/ keep their names, and a
+        # flat copy of input/ goes into the working directory because the .sm
+        # scripts open their data files by bare name.
+        file(COPY "${PROJECT_SOURCE_DIR}/t/testsuite/input"
+             DESTINATION "${SAC_TEST_DIR}")
+        file(COPY "${PROJECT_SOURCE_DIR}/t/testsuite/output"
+             DESTINATION "${SAC_TEST_DIR}")
+        file(COPY "${PROJECT_SOURCE_DIR}/t/testsuite/input/"
+             DESTINATION "${SAC_TEST_DIR}")
+        file(GLOB SAC_TEST_TXT "${PROJECT_SOURCE_DIR}/t/*.txt")
+        file(COPY ${SAC_TEST_TXT} DESTINATION "${SAC_TEST_DIR}")
+
+        # The test list comes from t/Makefile.am rather than from a glob: the
+        # autotools build is the authority on which tests exist, so tests that
+        # upstream disabled stay disabled here too.
+        file(READ "${PROJECT_SOURCE_DIR}/t/Makefile.am" SAC_MAKEFILE_AM)
+        string(REGEX MATCHALL "testsuite/input/[A-Za-z0-9_]+\\.sm"
+               SAC_SM_TESTS "${SAC_MAKEFILE_AM}")
+
+        # Disabled upstream (commented out in Makefile.am): event, traveltime
+        # and station.  The last three drive the X11 device directly, which the
+        # Windows backend cannot run.
+        set(SAC_TESTS_DISABLED
+            event.sm traveltime.sm station.sm
+            begindevices.sm report.sm enddevices.sm)
+
+        set(SAC_NTESTS 0)
+        foreach(_sm IN LISTS SAC_SM_TESTS)
+            get_filename_component(_name "${_sm}" NAME)
+            if(_name IN_LIST SAC_TESTS_DISABLED)
+                continue()
+            endif()
+
+            string(REGEX REPLACE "\\.sm$" "" _tname "${_name}")
+            add_test(NAME "sm/${_tname}"
+                     COMMAND "${Python3_EXECUTABLE}"
+                             "${PROJECT_SOURCE_DIR}/t/pytest.py"
+                             --test
+                             --sac "$<TARGET_FILE:sac>"
+                             --output output
+                             "input/${_name}")
+            # The tests write scratch files into the working directory, so
+            # they must not run concurrently.
+            set_tests_properties("sm/${_tname}" PROPERTIES
+                                 WORKING_DIRECTORY "${SAC_TEST_DIR}"
+                                 RUN_SERIAL TRUE
+                                 TIMEOUT 600)
+            math(EXPR SAC_NTESTS "${SAC_NTESTS} + 1")
+        endforeach()
+
+        message(STATUS "Registered ${SAC_NTESTS} t/ testsuite tests with CTest")
+    endif()
+endif()

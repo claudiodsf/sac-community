@@ -129,3 +129,74 @@ jobs:
       - name: Show Xvfb log
         if: failure() && runner.os == 'macOS'
         run: cat "$RUNNER_TEMP/xvfb.log" || true
+
+  # ---------------------------------------------------------------------------
+  # Windows
+  #
+  # Windows builds with CMake rather than autotools (see win/README.md) and has
+  # its own graphics backend, so it is a separate job rather than another entry
+  # in the matrix above.  The t/ testsuite is registered with CTest; the tests
+  # that drive the X11 device are skipped when it is registered (CMakeLists.txt
+  # lists them in SAC_TESTS_DISABLED).
+  # ---------------------------------------------------------------------------
+  windows:
+    name: ${{ matrix.platform.name }}
+    runs-on: ${{ matrix.platform.runs-on }}
+    # windows-11-arm is a public preview runner; keep it from reddening the
+    # workflow while it is only there for information.
+    continue-on-error: ${{ matrix.platform.experimental || false }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: windows-x86_64
+            runs-on: windows-latest
+            msystem: UCRT64
+            packages: >-
+              git
+              mingw-w64-ucrt-x86_64-gcc
+              mingw-w64-ucrt-x86_64-cmake
+              mingw-w64-ucrt-x86_64-ninja
+              mingw-w64-ucrt-x86_64-pkgconf
+              mingw-w64-ucrt-x86_64-libxml2
+              mingw-w64-ucrt-x86_64-curl
+              mingw-w64-ucrt-x86_64-zlib
+              mingw-w64-ucrt-x86_64-python
+          - name: windows-arm64
+            runs-on: windows-11-arm
+            msystem: CLANGARM64
+            experimental: true
+            packages: >-
+              git
+              mingw-w64-clang-aarch64-clang
+              mingw-w64-clang-aarch64-cmake
+              mingw-w64-clang-aarch64-ninja
+              mingw-w64-clang-aarch64-pkgconf
+              mingw-w64-clang-aarch64-libxml2
+              mingw-w64-clang-aarch64-curl
+              mingw-w64-clang-aarch64-zlib
+              mingw-w64-clang-aarch64-python
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v5
+      - name: Install MSYS2 and dependencies
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.platform.msystem }}
+          install: ${{ matrix.platform.packages }}
+      - name: Configure
+        shell: msys2 {0}
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        shell: msys2 {0}
+        run: cmake --build build
+      - name: Test
+        shell: msys2 {0}
+        timeout-minutes: 60
+        run: ctest --test-dir build --output-on-failure
+      - name: Show failing test details
+        if: failure()
+        shell: msys2 {0}
+        run: |
+          cat build/Testing/Temporary/LastTest.log || true
