@@ -284,17 +284,27 @@ main(int __argc, char **__argv) {
     win_init();
 
     /* Run a macro or command given on the command line, the way the X11 and
-     * macOS entry points do with zgimsg() and execute_command_line().  Without
-     * this, arguments are silently ignored on Windows. */
-    if (__argc > 1) {
-        char kmsg[MCMSG + 1];
+     * macOS entry points do with zgimsg() and execute_command_line().  Only
+     * arguments after the options are a macro: the flags (--stdout,
+     * --history-off, ...) are consumed above, and passing them on would make
+     * SAC try to run "macro --stdout ..." and fail to find that file.
+     * src/main/sac.c does the same by advancing argv past optind. */
+    {
+        int i = 1;
 
-        memset(&(kmsg[0]), ' ', MCMSG);
-        kmsg[0] = '\0';
-        kmsg[MCMSG] = '\0';
+        while (i < __argc && __argv[i][0] == '-' && __argv[i][1] != '\0') {
+            i++;
+        }
+        if (i < __argc) {
+            char kmsg[MCMSG + 1];
 
-        zgimsg(__argc, __argv, kmsg, MCMSG + 1);
-        execute_command_line(kmsg, MCMSG + 1);
+            memset(&(kmsg[0]), ' ', MCMSG);
+            kmsg[0] = '\0';
+            kmsg[MCMSG] = '\0';
+
+            zgimsg(__argc - (i - 1), __argv + (i - 1), kmsg, MCMSG + 1);
+            execute_command_line(kmsg, MCMSG + 1);
+        }
     }
 
     /* Put Console on its own Thread */
