@@ -554,7 +554,7 @@ libsac_all_a_SOURCES = bs/iniam.c bs/fid.c bs/octopus.c \
 	xyz/xxyzc.c xyz/xyzcleanup.c xyz/xzcolors.c xyz/xzlabels.c \
 	xyz/xzlevels.c xyz/xzlines.c xyz/xzticks.c xyz/zfft.c
 
-libsac_win_a_SOURCES = win/WinSacView.c win/windows_sac.c
+libsac_win_a_SOURCES = win/WinSacView.c win/windows_sac.c win/win_view.cpp
 
 libsac_check_a_SOURCES = ucf/cnvatf.c ucf/cnvati.c ucf/inctim.c ucf/inctimf.c \
 	                 ucf/cnvfta.c ucf/copydouble.c bs/fstr.c

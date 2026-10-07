@@ -48,6 +48,19 @@ xsystemcommand(int *nerr) {
         goto L_8888;
     }
 
+    /* lcrest() rebuilds the rest of the line from its tokens and appends a
+     * blank after every one of them, so the command string ends in a space.
+     * A POSIX shell ignores it, but cmd.exe's built-in echo prints everything
+     * after "echo " verbatim, so sm/systemcommand printed
+     *
+     *   Hello
+     *
+     * as "Hello " and failed.  Drop the trailing blanks: they can never be
+     * significant in a shell command. */
+    while (ncmsg > 0 && (kmsg[ncmsg - 1] == ' ' || kmsg[ncmsg - 1] == '\t')) {
+        kmsg[--ncmsg] = '\0';
+    }
+
     if(bbvar_s > 0) {
         bbval = zsysop_gets(kmsg, MCMSG + 1, &ncmsg, nerr);
         if(bbval && *nerr == 0) {

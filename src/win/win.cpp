@@ -17,9 +17,7 @@ extern "C" {
     char*    getline_stdin();
     void     main_command(char *kmsg, int n);
     void     win_init();
-    SacView *SacViewInit();
     void     SacViewDraw(SacView *view);
-    void     win_set_current(SacView *view);
     char *   ImageToBounds(SacImage *im, SacRect bounds);
     unsigned int sleep(unsigned int seconds);
     void     sac_command_line_copyright(int argc, char **argv);
@@ -29,35 +27,27 @@ extern "C" {
     /* C code defined in src/main/sac.c; declared there and in src/osx/stubs.c */
     void     execute_command_line(char *kmsg, int len);
 
-    void     SacViewWindowsAdd(SacViewWindows *wins, SacView *view);
     SacView *SacViewWindowsGetByHandle(SacViewWindows *wins, HWND handle);
     SacViewWindows *SacViewWindowsInit();
 
-    /* C++ Code */
-    void      sac_draw_line (HDC hdc, 
-                             float x1, float y1, float x2, float y2,
-                             float red, float green, float blue, 
-                             int width);
-    void      sac_draw_image (HDC hdc, int x, int y, int w, int h, char *data);
+    /* C++ code, defined in src/win/win_view.cpp together with the window and
+     * drawing runtime: the C device in windows_sac.c calls these, so they
+     * cannot live in the file that holds the program's entry point. */
     void      SacWindowShow  (SacView *view);
-    SacView * SacWindow      (int id);
     void      SacWindowAdd   (int id);
     int       use_tty        ();
-    SacViewWindows *wins = NULL;
+
+    /* Also defined in win_view.cpp.  The entry point below sets the thread ids
+     * up and registers the window class whose name is Application. */
+    extern SacViewWindows *wins;
+    extern char Application[];
+    extern DWORD main_thread;
+    extern DWORD ThreadId;
 }
 
 #define MAX_CONSOLE_LINES 500
 
-#define SAC_WINDOW_CREATE (WM_APP + 1)
-#define SAC_WINDOW_SHOW   (WM_APP + 2)
-
-char Application[] = "SAC";
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
-DWORD ThreadId;
-
-//SacView *view;
-
-DWORD main_thread;
 
 int
 show_prompt() {
@@ -77,119 +67,10 @@ DWORD WINAPI ConsoleIO(LPVOID lpArg) {
   return 0;
 }
 
-void
-SacWindowAdd(int id) {
-    DEBUG("\n");
-    if(GetCurrentThreadId() == main_thread) {
-        SacView *view;
-        DEBUG("main thread\n");
-        view = SacWindow( id );
-        SacViewWindowsAdd(wins, view);
-        ShowWindow(view->window_handle, SW_SHOWNORMAL);
-        UpdateWindow(view->window_handle);
-        PostThreadMessage(ThreadId, SAC_WINDOW_CREATE, id, 0);
-    } else {
-      MSG msg;
-      DEBUG("post message: CREATE WINDOW\n");
-      if(!PostThreadMessage(main_thread, SAC_WINDOW_CREATE, id,0)) {
-            fprintf(stderr, "Error attempting to create window on GUI Thread\n");
-      }
-      GetMessage(&msg, NULL, 0,0);
-      if(msg.message != SAC_WINDOW_CREATE) {
-        fprintf(stderr, "Error creating window\n");
-        exit(-1);
-      }
-      DEBUG("post message: CREATE WINDOW: DONE\n");
-    }
-}
-
-/* Pick a default size and position for a new plot window: three quarters of the
- * usable screen, so that plots are readable without being resized first, but
- * never larger than the work area (which excludes the taskbar). */
-static void
-SacWindowDefaultGeometry(int id, int *x, int *y, int *width, int *height) {
-    RECT work;
-    int work_w, work_h;
-
-    /* Fall back to the primary screen if the work area is unavailable. */
-    work.left = 0;
-    work.top = 0;
-    work.right = GetSystemMetrics(SM_CXSCREEN);
-    work.bottom = GetSystemMetrics(SM_CYSCREEN);
-    SystemParametersInfo(SPI_GETWORKAREA, 0, &work, 0);
-
-    work_w = work.right - work.left;
-    work_h = work.bottom - work.top;
-
-    *width = (int) (work_w * 0.75);
-    *height = (int) (work_h * 0.75);
-    if (*width < 640) {
-        *width = (work_w < 640) ? work_w : 640;
-    }
-    if (*height < 480) {
-        *height = (work_h < 480) ? work_h : 480;
-    }
-
-    /* Centre the window, offsetting each extra window so they do not stack. */
-    *x = work.left + (work_w - *width) / 2 + (id - 1) * 24;
-    *y = work.top + (work_h - *height) / 2 + (id - 1) * 24;
-}
-
-SacView * 
-SacWindow(int id) {
-    SacView *view;
-    HWND hwnd;
-    TCHAR title[100];
-    int x, y, width, height;
-    int n;
-
-    memset(&title[0], 0, 100);
-
-#ifdef UNICODE
-    n = swprintf(&title[0], 100, "Sac Plot Window: %d", id);
-#else
-    n = snprintf(&title[0], 100, "Sac Plot Window: %d", id);
-#endif
-
-    SacWindowDefaultGeometry(id, &x, &y, &width, &height);
-
-    hwnd = CreateWindow(Application, 
-                        title,
-                        WS_OVERLAPPEDWINDOW,
-                        x, y, 
-                        width, height,
-                        NULL,NULL,
-                        NULL,//hInstance,
-                        NULL);
-    
-    if (!hwnd) {
-        fprintf(stderr, "Error creating window\n");
-        exit(-1);
-        return 0;
-    }
-    view = SacViewInit();
-    view->window_handle = hwnd;
-    view->id            = id;
-    win_set_current(view);
-
-    return view;
-}
-
-void
-SacWindowShow(SacView *view) {
-    if(!view) {
-        return;
-    }
-    if(GetCurrentThreadId() == main_thread) {
-        //ShowWindow(view->window_handle, SW_SHOW);
-        SetWindowPos(view->window_handle, HWND_TOP, 0,0, 0,0,
-                     SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW );
-    } else {
-        if(!PostThreadMessage(main_thread, SAC_WINDOW_SHOW, (WPARAM)view, 0)) {
-            fprintf(stderr, "Error attempting to show_window on GUI Thread\n");
-        }
-    }
-}
+/* SacWindowAdd(), SacWindowDefaultGeometry(), SacWindow(), SacWindowShow()
+ * and the sac_draw_*() helpers live in src/win/win_view.cpp now, so that the
+ * Win32 device can be linked without the program's entry point - the t/ unit
+ * tests reach the device through inigdm() and have to do exactly that. */
 
 #ifdef GUI_APP
 int WINAPI
@@ -326,26 +207,6 @@ main(int __argc, char **__argv) {
 #endif
 
     return 0;
-}
-
-void
-sac_draw_line(HDC hdc, 
-              float x1, float y1, 
-              float x2, float y2, 
-              float red, float green, float blue, 
-              int width) {
-    Graphics graphics(hdc);
-    Pen      pen(Color(255,red,green,blue), width);
-    graphics.SetSmoothingMode(SmoothingModeHighQuality);
-    graphics.DrawLine(&pen, x1,y1, x2,y2);
-}
-
-void
-sac_draw_image(HDC hdc, int x, int y, int w, int h, char *data) {
-    Graphics graphics(hdc);
-    Bitmap   bitmap(w,h, w*4, PixelFormat32bppARGB, (BYTE *) data);
-    graphics.SetSmoothingMode(SmoothingModeHighQuality);
-    graphics.DrawImage(&bitmap, x, y);
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)

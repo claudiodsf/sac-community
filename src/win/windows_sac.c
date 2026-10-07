@@ -124,6 +124,25 @@ win_window_size(float *xmin, float *xmax, float *ymin, float *ymax, int use_rati
     *ymax = 1.0;
 }
 
+/* Size of the plot window in pixels.  text_box_line() and text_box_symbol()
+ * call this hook unconditionally, so it has to exist: the view keeps the
+ * client size that the last paint measured. */
+void
+win_get_geometry(int number, unsigned int *width, unsigned int *height,
+                 int *nerr) {
+    UNUSED(number);
+    *nerr = 0;
+    *width = (unsigned int) (current_view ? current_view->bounds.width : 1);
+    *height = (unsigned int) (current_view ? current_view->bounds.height : 1);
+}
+
+/* The GDI+ backend draws solid lines only, but callers such as
+ * text_box_line() set the style unconditionally, so accept and ignore it. */
+void
+win_set_line_style(int *iline) {
+    UNUSED(iline);
+}
+
 //    return (SacViewWindowsFindByID(wins, num) > 0);
 
 void
@@ -464,12 +483,12 @@ initdevice_win() {
     win.get_ratio = win_ratio;
     win.get_device_ratio = win_device_ratio;
     win.get_alpha_info = win_alpha_info;
-    //win.get_geometry           = get_geometry3;
+    win.get_geometry = win_get_geometry;
     win.move = win_move;
     //win.put_image              = win_put_image;
     win.set_color = win_set_color;
     win.set_color_table = win_set_color_table;
-    //win.set_line_style         = setlinestyle3; *
+    win.set_line_style = win_set_line_style;
     win.set_line_width = win_set_width;
     win.set_pseudo_color_table = win_set_pseudo_color_table;
     //win.set_text_size          = settextsize3; *

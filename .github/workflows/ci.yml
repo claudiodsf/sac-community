@@ -88,7 +88,30 @@ jobs:
         if: runner.os == 'Linux'
         timeout-minutes: 20
         working-directory: ./build
-        run: xvfb-run -a make check
+        run: |
+          # Start Xvfb by hand rather than with xvfb-run, so that -noreset can
+          # be passed: it keeps the X server from resetting (and briefly
+          # refusing connections) when the last client disconnects.  The X11
+          # device tests close and reopen the display in a tight loop, which
+          # could otherwise make a reconnect fail with SAC error 203, "Can't
+          # create X window" - the same setup the macOS step below uses.
+          sudo mkdir -p /tmp/.X11-unix
+          sudo chmod 1777 /tmp/.X11-unix
+          Xvfb :99 -screen 0 1280x1024x24 -noreset -nolisten tcp \
+            >"$RUNNER_TEMP/xvfb.log" 2>&1 &
+          for _ in {1..30}; do
+            if [ -S /tmp/.X11-unix/X99 ]; then break; fi
+            sleep 1
+          done
+          if [ ! -S /tmp/.X11-unix/X99 ]; then
+            echo "::error::Xvfb did not start on display :99"
+            cat "$RUNNER_TEMP/xvfb.log" || true
+            exit 1
+          fi
+          export DISPLAY=:99
+          # Not re-tried on failure: the X server above is already configured
+          # not to reset, so a failure here is a genuine one.
+          make check
       - name: Test (macOS)
         if: runner.os == 'macOS'
         timeout-minutes: 30
@@ -127,7 +150,7 @@ jobs:
         working-directory: ./build
         run: cat t/test-suite.log || true
       - name: Show Xvfb log
-        if: failure() && runner.os == 'macOS'
+        if: failure()
         run: cat "$RUNNER_TEMP/xvfb.log" || true
 
   # ---------------------------------------------------------------------------
@@ -153,6 +176,13 @@ jobs:
           - name: windows-x86_64
             runs-on: windows-latest
             msystem: UCRT64
+            # This configuration hangs in a handful of tests.  The reference
+            # platforms run all but eight of the 192 tests in under two seconds
+            # (see SAC_SLOW_TESTS in CMakeLists.txt), so a short budget reports
+            # every failure within seconds and still leaves the plotting tests
+            # plenty of room.
+            test_timeout: 20
+            test_timeout_slow: 120
             packages: >-
               git
               mingw-w64-ucrt-x86_64-gcc
@@ -167,6 +197,8 @@ jobs:
             runs-on: windows-11-arm
             msystem: CLANGARM64
             experimental: true
+            test_timeout: 600
+            test_timeout_slow: 600
             packages: >-
               git
               mingw-w64-clang-aarch64-clang
@@ -187,7 +219,10 @@ jobs:
           install: ${{ matrix.platform.packages }}
       - name: Configure
         shell: msys2 {0}
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: >-
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          -DSAC_TEST_TIMEOUT=${{ matrix.platform.test_timeout }}
+          -DSAC_TEST_TIMEOUT_SLOW=${{ matrix.platform.test_timeout_slow }}
       - name: Build
         shell: msys2 {0}
         run: cmake --build build

@@ -123,7 +123,7 @@ OpenAndValidate(char *fileName) {
         return 0;
     }
 
-    ptr = fopen(fileName, "rtb");
+    ptr = fopen(fileName, "rb");
     if (!ptr) {
         printf("ERROR: Could not open (%s).\n", fileName);
         return 0;

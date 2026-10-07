@@ -39,6 +39,28 @@ else()
     add_compile_options(-w)
 endif()
 
+# The autotools build optimises with -O2 (CI runs ../configure
+# --enable-optim=2), and that is the configuration the reference outputs were
+# produced with.  CMake's Release adds -O3 instead, and on Windows/x86_64 that
+# makes 28 of the 192 tests fail - with GCC's optimiser on this old,
+# type-punning C that is a classic symptom of undefined behaviour being
+# exploited, and clang (the arm64 build) is less aggressive about it.  Match the
+# reference build rather than diverge from it.
+if(MINGW)
+    set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG" CACHE STRING "" FORCE)
+endif()
+
+# The autotools build always adds -ffp-contract=off (config/code.m4) so that
+# floating point results are reproducible; without it the compiler is free to
+# contract a*b+c into an FMA, which changes the last digits of the values the
+# testsuite prints and makes the expected output stop matching.
+include(CheckCCompilerFlag)
+check_c_compiler_flag(-ffp-contract=off SAC_HAVE_FFP_CONTRACT)
+if(SAC_HAVE_FFP_CONTRACT)
+    add_compile_options(-ffp-contract=off)
+endif()
+
 # MinGW-w64 declares asprintf, vasprintf, strsep and friends only when
 # _GNU_SOURCE is defined, even though libmingwex provides the symbols.  The
 # autotools build defines this for Linux; Windows needs it for the same reason.
@@ -196,6 +218,7 @@ endfunction()
 sac_patch_component(libmseed                libmseed-stat.patch)
 sac_patch_component(fern                    fern-arg-double.patch)
 sac_patch_component(evalresp/libsrc/mxml   mxml-ssize_t.patch)
+sac_patch_component(evalresp/libsrc/evalresp evalresp-findfirst-handle.patch)
 sac_patch_component(sacio                   time64-prid64.patch
                                             sacio-binary-mode.patch)
 
@@ -257,11 +280,11 @@ target_include_directories(pile PUBLIC "${SAC_PATCH_ROOT}/fern")
 # evalresp and its bundled helpers.  The examples/ and test/ directories are
 # deliberately not globbed: they contain standalone programs (and, for
 # evalresp_log, a syslog example that does not build on Windows).
-file(GLOB EVALRESP_SOURCES      CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/evalresp/libsrc/evalresp/*.c")
+file(GLOB EVALRESP_SOURCES      CONFIGURE_DEPENDS "${SAC_PATCH_ROOT}/evalresp/libsrc/evalresp/*.c")
 # The StationXML support lives one directory down and is referenced by
 # evalresp/input.c (evalresp_xml_stream_to_resp_file), so it must be compiled
 # too.  examples/ is deliberately not globbed: it holds standalone programs.
-file(GLOB EVALRESP_XML_SOURCES  CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/evalresp/libsrc/evalresp/stationxml2resp/*.c")
+file(GLOB EVALRESP_XML_SOURCES  CONFIGURE_DEPENDS "${SAC_PATCH_ROOT}/evalresp/libsrc/evalresp/stationxml2resp/*.c")
 file(GLOB EVALRESP_LOG_SOURCES  CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/evalresp/libsrc/evalresp_log/*.c")
 file(GLOB MXML_SOURCES          CONFIGURE_DEPENDS "${SAC_PATCH_ROOT}/evalresp/libsrc/mxml/*.c")
 # mmd.c, mxmldoc.c and testmxml.c are standalone programs that happen to live in
@@ -327,16 +350,39 @@ if(SAC_GUI_SUBSYSTEM)
     set(SAC_EXE_SUBSYSTEM WIN32)
 endif()
 
+# src/win/sac_resource.rc no longer defines anything: the File and Stuff menus
+# were removed and no icon was ever added, so it is just an #include and a
+# comment.  Clang's windres tolerates that but GNU windres does not, and fails
+# the build with "windres.exe: no resources" -- which is what broke the UCRT64
+# (x86_64) configuration.  Leave it out of the build rather than give the
+# executable an icon it does not use.
+list(REMOVE_ITEM SAC_EXE_SOURCES src/win/sac_resource.rc)
+
 add_executable(sac ${SAC_EXE_SUBSYSTEM} ${SAC_EXE_SOURCES} ${SAC_LIBSAC_WIN})
 target_include_directories(sac PRIVATE ${SAC_INCLUDE_DIRS})
 
-target_link_libraries(sac PRIVATE
+# The static libraries SAC is built from.  GNU ld resolves archives in a single
+# left-to-right pass, so a definition must follow every object that refers to
+# it: win_compat supplies ioctl() to fern's request.c and localtime_r() to
+# sacio's time64.c, while src/ucf/distaz.c (in sac_libs) is called by sacio.c
+# in sacio_bsd.  A plain list is therefore order-sensitive and fails to link
+# with UCRT64's GNU ld.  --start-group makes the order irrelevant.  The CLANGARM64
+# configuration links with ld.lld, which is not order-sensitive, which is why
+# this only ever broke x86_64.
+set(SAC_INTERNAL_LIBS
     sac_libs
     win_compat
     fern pile
     mseed
     sacio_bsd
     evalresp evalresp_log mxmlev spline)
+
+if(MINGW)
+    target_link_libraries(sac PRIVATE
+        -Wl,--start-group ${SAC_INTERNAL_LIBS} -Wl,--end-group)
+else()
+    target_link_libraries(sac PRIVATE ${SAC_INTERNAL_LIBS})
+endif()
 
 # Third-party libraries.  With SAC_STATIC_DEPS the complete static link chain
 # comes from pkg-config (libcurl alone pulls in TLS, HTTP/2, brotli, zstd, ...),
@@ -368,6 +414,16 @@ target_link_libraries(sac PRIVATE gdiplus ws2_32)
 # Static runtime so the resulting sac.exe does not need MinGW DLLs.
 if(MINGW)
     target_link_options(sac PRIVATE -static -static-libgcc -static-libstdc++)
+    # The PE default stack reserve is 2 MB here, which the deeper code paths
+    # overrun: sm/bbfk died with 0xC00000FD (STATUS_STACK_OVERFLOW) and, on
+    # x86_64, a stack overrun does not fault cleanly - it writes past the stack,
+    # which shows up as heap corruption (0xC0000374) and as tests that hang.
+    # The tests that fail on x86_64 are exactly the recursion-heavy ones
+    # (evalresp/XML in sm/transfer*, the macro recursion in sm/test_do and
+    # friends, the recursive-descent evaluator, sm/bbfk), while the arm64 build
+    # - clang, whose frames are smaller - passes the same code with 8 MB.
+    # A reserve is virtual, so a generous one costs nothing until it is used.
+    target_link_options(sac PRIVATE -Wl,--stack,67108864)
 endif()
 
 # ---------------------------------------------------------------------------
@@ -402,7 +458,16 @@ if(SAC_BUILD_UTILS)
         add_executable(${_prog} "${PROJECT_SOURCE_DIR}/utils/${_prog}.c")
         target_include_directories(${_prog} PRIVATE ${SAC_INCLUDE_DIRS})
         if(_prog IN_LIST SAC_UTILS_WITH_SACIO)
-            target_link_libraries(${_prog} PRIVATE sacio_sac)
+            if(MINGW)
+                # Grouped for the same reason as sac.exe: distaz() lives in
+                # sacio_sac, but its caller sacio.c is in sacio_bsd, which
+                # CMake places after it on the link line.
+                target_link_libraries(${_prog} PRIVATE
+                    -Wl,--start-group sacio_sac sacio_bsd win_compat
+                    -Wl,--end-group)
+            else()
+                target_link_libraries(${_prog} PRIVATE sacio_sac)
+            endif()
         endif()
         if(MINGW)
             target_link_options(${_prog} PRIVATE -static -static-libgcc)
@@ -491,6 +556,25 @@ add_custom_target(dist
 # Windows has its own graphics backend (src/win/), so the tests that drive the
 # X11 device directly are skipped; see SAC_TESTS_REQUIRING_X11 below.
 # ---------------------------------------------------------------------------
+# Per-test time budget for the t/ testsuite.  600 s is what the suite needs
+# when everything works; lower it when chasing a hang, so that a broken run
+# reports every failure in seconds instead of spending ten minutes per hanging
+# test (the Windows x86_64 CI job sets these - see .github/workflows/ci.yml and
+# win/README.md).
+#
+# Measured on the arm64 build, which is about twice as slow as the CI runner:
+# of the 192 tests, only the ones below take more than 2.2 s, and the rest are
+# well under a second.  So a 20 s budget is generous for almost everything and
+# makes a hang obvious immediately, while the handful that plot or filter
+# thousands of points get SAC_TEST_TIMEOUT_SLOW:
+#
+#   sss 28.7 s   bandpass 22.6 s   spe 10.0 s   merge 9.6 s
+#   color 8.4 s  pause 8.3 s       plot 5.7 s   symbol 5.4 s
+set(SAC_TEST_TIMEOUT 600 CACHE STRING "Per-test timeout for the t/ testsuite")
+set(SAC_TEST_TIMEOUT_SLOW 600 CACHE STRING
+    "Per-test timeout for the tests listed in SAC_SLOW_TESTS")
+set(SAC_SLOW_TESTS sss bandpass spe merge color pause plot symbol)
+
 include(CTest)
 
 if(BUILD_TESTING)
@@ -544,15 +628,132 @@ if(BUILD_TESTING)
                              --sac "$<TARGET_FILE:sac>"
                              --output output
                              "input/${_name}")
-            # The tests write scratch files into the working directory, so
-            # they must not run concurrently.
+            # Each of these tests has to fit in this budget.  A test that hangs
+            # still fails, it just fails sooner, which is what makes a broken
+            # configuration cheap to iterate on.
+            if(_tname IN_LIST SAC_SLOW_TESTS)
+                set(_timeout ${SAC_TEST_TIMEOUT_SLOW})
+            else()
+                set(_timeout ${SAC_TEST_TIMEOUT})
+            endif()
             set_tests_properties("sm/${_tname}" PROPERTIES
                                  WORKING_DIRECTORY "${SAC_TEST_DIR}"
                                  RUN_SERIAL TRUE
-                                 TIMEOUT 600)
+                                 TIMEOUT ${_timeout})
             math(EXPR SAC_NTESTS "${SAC_NTESTS} + 1")
         endforeach()
 
         message(STATUS "Registered ${SAC_NTESTS} t/ testsuite tests with CTest")
+    endif()
+endif()
+
+# ---------------------------------------------------------------------------
+# t/: the compiled library unit tests
+#
+# t/Makefile.am builds these as check_PROGRAMS and lists them in TESTS.  They
+# are the only tests that exercise sacio, ucf, vars, msg and icm directly - the
+# sacio ones would have caught the text-mode output bug that had to be patched
+# for Windows - and the CMake build used to skip them entirely.
+#
+# They find the fixtures in t/ through TOP_SRCDIR (see t/sacio_test.h), which
+# is therefore compiled in, and they write their scratch files into the working
+# directory, so they get a directory of their own rather than sharing the one
+# the .sm tests stage into.
+#
+# t/copy_files.sh is not run as a test: the staging above already does what it
+# does, and t/sacio_fortran.sh only wraps the two Fortran programs below.
+# ---------------------------------------------------------------------------
+if(BUILD_TESTING)
+    add_library(test_unit STATIC "${PROJECT_SOURCE_DIR}/t/unit.c")
+    target_include_directories(test_unit PUBLIC "${PROJECT_SOURCE_DIR}/t")
+    target_include_directories(test_unit PRIVATE ${SAC_INCLUDE_DIRS})
+
+    # Forward slashes: the value ends up in the C source as a string literal.
+    file(TO_CMAKE_PATH "${PROJECT_SOURCE_DIR}" SAC_TOP_SRCDIR)
+
+    set(SAC_UNIT_TEST_DIR "${CMAKE_BINARY_DIR}/t-unit")
+    file(MAKE_DIRECTORY "${SAC_UNIT_TEST_DIR}")
+
+    # t/icm.c and friends open the data files in t/ by bare name (acc.txt,
+    # bbdisp.txt, ...) and write their converted output next to them, so stage
+    # the same fixtures t/copy_files.sh stages for the autotools build.
+    file(GLOB SAC_UNIT_TEST_FIXTURES "${PROJECT_SOURCE_DIR}/t/*.txt"
+                                     "${PROJECT_SOURCE_DIR}/t/*.sac")
+    file(COPY ${SAC_UNIT_TEST_FIXTURES} DESTINATION "${SAC_UNIT_TEST_DIR}")
+
+    # The archives need a group here for the same reason sac.exe does: GNU ld
+    # resolves them left to right, once.  $libs is "sacio" for the two programs
+    # that check the sacio library alone (t/Makefile.am links them with -lsacio
+    # only): linking the whole SAC library as well pulls in both SAC's own
+    # implementations and sacio's compat wrappers, and the two sets of symbols
+    # collide.
+    function(sac_add_unit_test name libs)
+        # sacio_bsd and win_compat are listed explicitly although sacio_sac
+        # depends on them: CMake appends a dependency's libraries *after* the
+        # items given here, i.e. after --end-group, where GNU ld will not find
+        # them again (UCRT64 failed with "undefined reference to `distaz'" and
+        # "`localtime_r'").  The same pattern is used for the utils targets.
+        if(libs STREQUAL "sacio")
+            set(_libs test_unit sacio_sac sacio_bsd win_compat)
+            set(_device "")
+        else()
+            set(_libs test_unit sac_libs sacio_sac sacio_bsd win_compat
+                      fern pile mseed evalresp evalresp_log mxmlev spline)
+            # Anything that reaches inigdm() needs the Win32 device, which sac.exe
+            # compiles in as sources rather than keeping in a library.
+            set(_device ${SAC_LIBSAC_WIN})
+        endif()
+        add_executable(${name} ${ARGN} ${_device})
+        target_include_directories(${name} PRIVATE ${SAC_INCLUDE_DIRS}
+                                                   "${PROJECT_SOURCE_DIR}/t")
+        target_compile_definitions(${name} PRIVATE
+                                   TOP_SRCDIR="${SAC_TOP_SRCDIR}")
+        if(MINGW)
+            target_link_libraries(${name} PRIVATE
+                -Wl,--start-group ${_libs} -Wl,--end-group)
+        else()
+            target_link_libraries(${name} PRIVATE ${_libs})
+        endif()
+        target_link_libraries(${name} PRIVATE PkgConfig::XML PkgConfig::ZLIB)
+        if(CURL_FOUND)
+            target_link_libraries(${name} PRIVATE CURL::libcurl)
+        endif()
+        # The Win32 device draws through GDI+, exactly as sac.exe does.
+        target_link_libraries(${name} PRIVATE gdiplus ws2_32)
+        add_test(NAME "lib/${name}" COMMAND ${name})
+        set_tests_properties("lib/${name}" PROPERTIES
+            WORKING_DIRECTORY "${SAC_UNIT_TEST_DIR}"
+            RUN_SERIAL TRUE
+            TIMEOUT 300
+            ENVIRONMENT "SACAUX=${SAC_TOP_SRCDIR}/sacaux")
+    endfunction()
+
+    set(_t "${PROJECT_SOURCE_DIR}/t")
+    sac_add_unit_test(use_sac    all      "${_t}/use_sac.c")
+    sac_add_unit_test(ucf        all      "${_t}/ucf.c" "${_t}/ucf_inctim.c"
+                                          "${_t}/ucf_cnvati.c" "${_t}/ucf_cnvita.c"
+                                          "${_t}/ucf_cnvatf.c" "${_t}/ucf_cnvfta.c")
+    sac_add_unit_test(vars       all      "${_t}/vars.c")
+    sac_add_unit_test(sacio      sacio    "${_t}/sacio.c" "${_t}/sacio_rsac1.c"
+                                          "${_t}/sacio_rsac2.c" "${_t}/sacio_wsac0.c"
+                                          "${_t}/sacio_wsac1.c" "${_t}/sacio_wsac2.c"
+                                          "${_t}/sacio_wsac3.c" "${_t}/sacio_getset.c")
+    sac_add_unit_test(icm        all      "${_t}/icm.c")
+    sac_add_unit_test(sacio_all  sacio    "${_t}/sacio_all.c")
+    sac_add_unit_test(sac_all    all      "${_t}/sac_all.c")
+    sac_add_unit_test(lckey_test all      "${_t}/lckey_test.c")
+
+    # saciof/saclibf check the libraries from Fortran.  Upstream builds them
+    # only when a Fortran compiler was found (HAVE_FC in t/Makefile.am); do the
+    # same rather than making a Fortran compiler a requirement.
+    include(CheckLanguage)
+    check_language(Fortran)
+    if(CMAKE_Fortran_COMPILER)
+        enable_language(Fortran)
+        sac_add_unit_test(saciof  all "${_t}/sacio_f.f")
+        sac_add_unit_test(saclibf all "${_t}/saclib_f.f")
+    else()
+        message(STATUS
+            "No Fortran compiler found, so t/saciof and t/saclibf are skipped")
     endif()
 endif()

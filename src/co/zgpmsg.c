@@ -39,6 +39,29 @@ zgpmsg(prmt, prmtlen, msg, msglen)
 
     fflush(stdout);
 
+    if (!use_tty()) {
+        /* This is the plot commands' "wait for a keypress between frames".
+         * There is no terminal and so no key to wait for, but the wait still
+         * has to consume its input, and it has to consume a whole line: with
+         * readline enabled co/select.c does exactly that, by reading the line
+         * with getline_stdin(), and the testsuite reference output was produced
+         * with such a build.  Reading only the first msglen-1 characters - what
+         * getfline() below does - left the rest of the line behind, and the
+         * command dispatcher then ran it: sm/plot's "plot illegaloption" lost
+         * its first nine characters and "galoption" was executed as a system
+         * command, which cmd.exe reported as an unknown command.
+         *
+         * Note this whole file is only compiled without readline, so builds
+         * that have it are unaffected. */
+        int c, i = 0;
+        while ((c = getc(stdin)) != EOF && c != '\n') {
+            if (i < (int) msglen - 1)
+                msg[i++] = (char) c;
+        }
+        msg[i] = '\0';
+        return;
+    }
+
 /* A control-d sets the message response to quit */
     if (getfline(stdin, msg, (short) msglen) == -1)
         if (msglen >= 5)

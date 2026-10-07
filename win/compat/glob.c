@@ -4,6 +4,7 @@
 #ifdef _WIN32
 
 #include <windows.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -47,6 +48,82 @@ split_pattern(const char *pattern, char **dir_out, const char **file_out)
     *file_out = sep + 1;
 }
 
+/*
+ * Match a pattern with * , ? and [...] against a name, the way POSIX glob()
+ * does.  FindFirstFile() understands only * and ?, so the matching is done
+ * here instead: SAC patterns such as "arr_[r,b]*sac" need the character
+ * classes.  Matching is case-insensitive, as FindFirstFile() was.
+ */
+static int
+match_pattern(const char *pat, const char *name)
+{
+    while (*pat != '\0') {
+        if (*pat == '*') {
+            while (pat[1] == '*') {
+                pat++;
+            }
+            if (pat[1] == '\0') {
+                return 1;
+            }
+            for (;; name++) {
+                if (match_pattern(pat + 1, name)) {
+                    return 1;
+                }
+                if (*name == '\0') {
+                    return 0;
+                }
+            }
+        } else if (*pat == '?') {
+            if (*name == '\0') {
+                return 0;
+            }
+            pat++;
+            name++;
+        } else if (*pat == '[') {
+            const char *p = pat + 1;
+            int negate = 0;
+            int matched = 0;
+
+            if (*p == '!' || *p == '^') {
+                negate = 1;
+                p++;
+            }
+            do {
+                if (*p == '\0') {
+                    return 0;   /* unterminated class */
+                }
+                if (p[1] == '-' && p[2] != ']' && p[2] != '\0') {
+                    if (tolower((unsigned char) *name) >=
+                        tolower((unsigned char) p[0]) &&
+                        tolower((unsigned char) *name) <=
+                        tolower((unsigned char) p[2])) {
+                        matched = 1;
+                    }
+                    p += 3;
+                } else {
+                    if (tolower((unsigned char) *name) ==
+                        tolower((unsigned char) *p)) {
+                        matched = 1;
+                    }
+                    p++;
+                }
+            } while (*p != ']');
+            if (matched == negate) {
+                return 0;
+            }
+            pat = p + 1;
+            name++;
+        } else {
+            if (tolower((unsigned char) *pat) != tolower((unsigned char) *name)) {
+                return 0;
+            }
+            pat++;
+            name++;
+        }
+    }
+    return *name == '\0';
+}
+
 int
 glob(const char *pattern, int flags,
      int (*errfunc)(const char *epath, int eerrno), glob_t *pglob)
@@ -54,6 +131,7 @@ glob(const char *pattern, int flags,
     WIN32_FIND_DATAA fd;
     HANDLE h;
     char *dir;
+    char *search;
     const char *file;
     char **vec;
     size_t cap;
@@ -84,7 +162,30 @@ glob(const char *pattern, int flags,
     cap = GLOB_CHUNK;
     n = 0;
 
-    h = FindFirstFileA(pattern, &fd);
+    /* Enumerate the whole directory and match the final component here rather
+     * than handing the pattern to FindFirstFile(), whose matching understands
+     * * and ? but not the [...] classes POSIX glob() supports. */
+    if (dir != NULL) {
+        size_t dirlen = strlen(dir);
+        search = (char *) malloc(dirlen + 2);
+        if (search == NULL) {
+            free(vec);
+            free(dir);
+            return GLOB_NOSPACE;
+        }
+        strcpy(search, dir);
+        strcat(search, "*");
+    } else {
+        search = (char *) malloc(2);
+        if (search == NULL) {
+            free(vec);
+            return GLOB_NOSPACE;
+        }
+        strcpy(search, "*");
+    }
+
+    h = FindFirstFileA(search, &fd);
+    free(search);
     if (h == INVALID_HANDLE_VALUE) {
         free(vec);
         free(dir);
@@ -100,6 +201,9 @@ glob(const char *pattern, int flags,
 
         /* FindFirstFile() never returns these, but be explicit. */
         if (strcmp(fd.cFileName, ".") == 0 || strcmp(fd.cFileName, "..") == 0) {
+            continue;
+        }
+        if (!match_pattern(file, fd.cFileName)) {
             continue;
         }
 

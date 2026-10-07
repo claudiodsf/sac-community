@@ -6,6 +6,13 @@
 
 #define WIN_COLOR_MAXIMUM 255
 
+/* Posted to the GUI thread by SacWindowAdd() to ask it to create a plot window,
+ * and to show one that already exists.  The message loop in win.cpp, which
+ * owns the GUI thread, dispatches them; the runtime that posts them is in
+ * win_view.cpp. */
+#define SAC_WINDOW_CREATE (WM_APP + 1)
+#define SAC_WINDOW_SHOW   (WM_APP + 2)
+
 /* Posted to a plot window to make it the foreground, focused window.  The
  * command thread posts this when it starts reading cursor input, because
  * keyboard events only reach the focused window. */

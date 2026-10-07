@@ -409,6 +409,8 @@ SacViewMap(SacView * view, SacViewMapping map, SacPointComponent p, float z) {
 
 void sac_draw_line(HDC hdc, float x1, float y1, float x2, float y2, float red,
                    float green, float blue, int width);
+void sac_draw_polyline(HDC hdc, POINT *pts, int n, float red, float green,
+                       float blue, int width);
 void sac_draw_image(HDC hdc, int x, int y, int w, int h, void *data);
 
 void
@@ -455,17 +457,23 @@ SacViewDraw(SacView * view) {
                 break;
             case SV_Stroke:
                 break;
-            case SV_Poly:      /* Polyline(hdc, POINT *points, int npts); */
-                p = SacViewToBounds(view, obj->points[0], ratio);
-                x1 = p.x;
-                y1 = p.y;
-                for (j = 1; j < obj->npts; j++) {
-                    p = SacViewToBounds(view, obj->points[j], ratio);
-                    sac_draw_line(hdc, x1, y1, p.x, p.y, view->color.red,
-                                  view->color.green, view->color.blue,
-                                  view->width);
-                    x1 = p.x;
-                    y1 = p.y;
+            case SV_Poly:
+                /* One Polyline() call for the whole thing: a call per segment
+                 * cost minutes on the long traces SAC plots (sm/bandpass plots
+                 * ten of them with up to 900000 points each). */
+                if (obj->npts > 1) {
+                    POINT *pts = (POINT *) malloc(sizeof(POINT) * obj->npts);
+                    if (pts) {
+                        for (j = 0; j < obj->npts; j++) {
+                            p = SacViewToBounds(view, obj->points[j], ratio);
+                            pts[j].x = (LONG) (p.x + 0.5f);
+                            pts[j].y = (LONG) (p.y + 0.5f);
+                        }
+                        sac_draw_polyline(hdc, pts, obj->npts, view->color.red,
+                                          view->color.green, view->color.blue,
+                                          view->width);
+                        free(pts);
+                    }
                 }
                 break;
             case SV_Color:

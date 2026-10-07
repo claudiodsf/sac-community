@@ -133,7 +133,26 @@ zsysop_gets(char *comstr, int dummylen, int *pnumc, int *perr) {
     string *s = string_new("");
     char buf[BUFSIZE];
     char *p = NULL;
-#ifndef WIN32
+#ifdef WIN32
+    /* The CRT provides _popen()/_pclose(), not the POSIX spellings, and opens
+     * the pipe in text mode, so the output arrives with the same line endings
+     * as on POSIX.  Without this, "systemcommand <cmd> &TO$ <var>" neither ran
+     * the command nor set the variable on Windows.  The function is checked in
+     * t/lckey_test.c, which is the one compiled test that links libsac_all.a
+     * (where co/ lives). */
+    if((fp = _popen(comstr, "r")) == NULL) {
+        *perr = ERROR_EXECUTING_SYSTEM_COMMAND;
+        goto ERROR;
+    }
+    while(fgets(buf, BUFSIZE, fp) != NULL) {
+        s = string_append(s, buf);
+    }
+    if(_pclose(fp) == -1) {
+        *perr = ERROR_EXECUTING_SYSTEM_COMMAND;
+        goto ERROR;
+    }
+    p = strdup( string_string(s) );
+#else
     if((fp = popen(comstr, "r")) == NULL) {
         *perr = ERROR_EXECUTING_SYSTEM_COMMAND;
         goto ERROR;

@@ -1,0 +1,13 @@
+diff --git a/evalresp/libsrc/evalresp/file_ops.c b/evalresp/libsrc/evalresp/file_ops.c
+index 38a51af..2419090 100644
+--- a/evalresp/libsrc/evalresp/file_ops.c
++++ b/evalresp/libsrc/evalresp/file_ops.c
+@@ -273,7 +273,7 @@ get_names (char *in_file, struct matched_files *files, evalresp_logger *log)
+   struct file_list *lst_ptr, *tmp_ptr;
+   struct _finddata_t fblk; /* define block for 'findfirst()' fn */
+   /* setup things for Microsoft compiler compatibility: */
+-  int fhandval;
++  intptr_t fhandval;
+ #define ff_name name
+ #define findfirst(name, blk, attrib) (fhandval = _findfirst (name, blk))
+ #define findnext(blk) _findnext (fhandval, blk)

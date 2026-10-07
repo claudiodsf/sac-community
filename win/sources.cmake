@@ -1158,6 +1158,7 @@ set(SAC_LIBSACORACLESTUB
 set(SAC_LIBSAC_WIN
     src/win/WinSacView.c
     src/win/windows_sac.c
+    src/win/win_view.cpp
 )
 
 set(SAC_EXE_SOURCES

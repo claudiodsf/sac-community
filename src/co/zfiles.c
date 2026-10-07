@@ -10,9 +10,11 @@
 
 #include "config.h"
 
-#ifndef WIN32
+/* glob() is used on every platform: on Windows win/compat/glob.c provides
+ * it (and matches the pattern itself, which FindFirstFile() does not do for
+ * the [...] character classes). */
 #include <glob.h>
-#else
+#ifdef WIN32
 #include <windows.h>
 #endif
 
@@ -67,14 +69,8 @@ zfiles(char *kdirin, char *kpatrn, int *nErr) {
 
     char *command;
     string_list *files;
-#ifdef WIN32
-    WIN32_FIND_DATA FindFileData;
-    HANDLE hFind;
-    char *file = NULL;
-#else
     int i;
     glob_t g;
-#endif
 
     *nErr = 0;
     files = string_list_init();
@@ -91,25 +87,15 @@ zfiles(char *kdirin, char *kpatrn, int *nErr) {
 
     *nErr = 0;
 
-#ifdef WIN32
-    hFind = FindFirstFile(command, &FindFileData);
-    if (hFind != INVALID_HANDLE_VALUE) {
-        do {
-            if (strcmp(FindFileData.cFileName, ".") != 0 &&
-                strcmp(FindFileData.cFileName, "..") != 0) {
-                asprintf(&file, "%s%s", kdirin, FindFileData.cFileName);
-                string_list_put(files, file, -1);
-                FREE(file);
-            }
-        } while (FindNextFile(hFind, &FindFileData) != 0);
-    }
-#else
+    /* Use glob() on every platform.  On Windows win/compat/glob.c provides
+     * it, and it matches the pattern itself instead of relying on
+     * FindFirstFile(), which does not understand the [...] character classes
+     * that patterns such as "arr_[r,b]*sac" need. */
     glob(command, 0, NULL, &g);
     for (i = 0; i < (int) g.gl_pathc; i++) {
         string_list_put(files, g.gl_pathv[i], -1);
     }
     free(command);
     globfree(&g);
-#endif
     return files;
 }

@@ -119,7 +119,40 @@ tests; without it they are simply not registered.
 
 The tests that drive the X11 device directly (`begindevices`, `report`,
 `enddevices`) are skipped, since Windows has its own graphics backend in
-`src/win/`. They are listed in `SAC_TESTS_DISABLED` in `CMakeLists.txt`.
+`src/win/`. They are listed in `SAC_TESTS_DISABLED` in `CMakeLists.txt`. Also
+skipped, because upstream disables them in `t/Makefile.am` itself, are
+`event`, `traveltime` and `station` — the last one "breaks routinely due to
+Station Database Updates". That leaves 184 of the 190 `.sm` files.
+
+The compiled library tests from `t/Makefile.am` (`use_sac`, `ucf`, `vars`,
+`sacio`, `icm`, `sacio_all`, `sac_all`, `lckey_test`) are registered too, as
+`lib/<name>` in CTest. They check sacio, ucf, vars, msg and icm directly, which
+nothing else does, and they need the same fixture staging that `t/copy_files.sh`
+performs; they run in `<build>/t-unit/`. Their two Fortran counterparts
+(`saciof`, `saclibf`) are built only when a Fortran compiler is present, as
+upstream's `HAVE_FC` does. `copy_files.sh` itself is not run as a test: the
+staging is what it does.
+
+The per-test time budget is `SAC_TEST_TIMEOUT` (default 600 s), with
+`SAC_TEST_TIMEOUT_SLOW` for the eight tests named in `SAC_SLOW_TESTS`. On the
+reference platforms every test except those eight finishes in under 2.2 s
+(`sss` 28.7 s, `bandpass` 22.6 s, then `spe`, `merge`, `color`, `pause`, `plot`
+and `symbol`), so the `windows-x86_64` CI job configures 20 s and 120 s: a test
+that hangs is then reported within seconds instead of occupying the job for ten
+minutes each, which is what used to make that job run out of its 90-minute
+budget before `ctest` could print a summary.
+
+Two features are known not to be covered by the testsuite:
+
+- `systemcommand <cmd> &TO$ <var>` cannot be reached through the command line
+  on any platform: SAC's parser expands a `&TO` token as a file-header
+  reference (`header_to_token()` in `src/eval/expr_util.c`) and reports
+  "unknown header format" before `xsystemcommand()` can match its keyword. The
+  capture function itself, `zsysop_gets()`, used to be compiled out entirely on
+  Windows (`#ifndef WIN32`) and now uses `_popen()`/`_pclose()`; it is checked
+  directly in `t/use_sac.c`.
+- The picking/cursor path and the window behaviour are exercised only
+  indirectly, through the `.sm` tests that plot (`plot`, `p1`, `p2`, `ppk`).
 
 ## Build options
 

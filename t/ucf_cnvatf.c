@@ -3,6 +3,11 @@
 #include <stdlib.h>
 #include <errno.h>
 
+/* The strtof shim below is guarded by HAVE_FUNC_STRTOF, which comes from
+ * config.h - without the include the guard is never satisfied, and on Windows,
+ * where <stdlib.h> defines strtof itself, that is a redefinition error. */
+#include "config.h"
+
 #include "unit.h"
 #include "ucf.h"
 

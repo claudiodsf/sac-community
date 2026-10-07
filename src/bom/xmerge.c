@@ -183,6 +183,18 @@ timing_cmp(const void *pa, const void *pb) {
             return 1;
         }
     }
+    /* Two files can begin at exactly the same time (for instance when the
+     * second one has been shifted with "ch allt" and its reference time has
+     * been moved back by the same amount).  Break the tie by position in the
+     * data file list so that the result does not depend on the sort
+     * implementation: glibc's qsort happens to keep the input order, which is
+     * what the testsuite expects, but the Windows CRT's does not. */
+    if (a->i < b->i) {
+        return -1;
+    }
+    if (a->i > b->i) {
+        return 1;
+    }
     return 0;
 }
 

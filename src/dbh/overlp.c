@@ -93,6 +93,15 @@ overlp(float *input, int npts, float *output, float *c, int nc, int nfft,
         /*   Data  */
         /* copy( (int*)&Input[iptr + nload1], (int*)&Buffer[nfft + 1],  nload2 ); */
         copy_float(&(Input[iptr + nload1]), &(Buffer[nfft + 1]), nload2);
+        /*   Zero the rest of the block: the signal ends inside this block, so
+         *   those samples do not exist.  Leaving them uninitialised feeds
+         *   garbage into the transform below -- glibc usually returns freshly
+         *   mmapped (zeroed) pages, which is why this only showed up on
+         *   Windows, where the transform of a long signal came out as NaN or
+         *   ~1e24 instead of the real values. */
+        if (nload2 < ngood) {
+            zero(&Buffer[nfft + 1 + nload2], ngood - nload2);
+        }
         /*   Initial condition */
         /* copy( (int*)&Input[iptr + ngood - nbad], (int*)&Buffer[nfft + 1 + ngood],  nbad ); */
         copy_float(&(Input[iptr + ngood - nbad]), &(Buffer[nfft + 1 + ngood]),

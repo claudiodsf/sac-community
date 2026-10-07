@@ -76,9 +76,13 @@ basename(const char *path)
 		return (bname);
 	}
 
-	/* Find the start of the base */
+	/* Find the start of the base.  A character cannot be both '/' and '\\',
+	 * so this has to stop at either separator: with '||' the test is always
+	 * true and the "base name" comes out as the whole path, which made
+	 * sm/read print "...test.read.dir/test.read.dir.2" instead of
+	 * "...test.read.dir.2" and sm/sss list its files with full paths. */
 	startp = endp;
-	while (startp > path && (*(startp - 1) != '/' || *(startp-1) != '\\'))
+	while (startp > path && *(startp - 1) != '/' && *(startp - 1) != '\\')
 		startp--;
 
 	len = endp - startp + 1;
@@ -113,8 +117,10 @@ dirname(const char *path)
 	while (endp > path && (*endp == '/' || *endp == '\\'))
 		endp--;
 
-	/* Find the start of the dir */
-	while (endp > path && (*endp != '/' || *endp == '\\'))
+	/* Find the start of the dir.  As in basename() above, both separators
+	 * have to end the scan: "(*endp != '/' || *endp == '\\')" is true for a
+	 * backslash, and true for any ordinary character. */
+	while (endp > path && *endp != '/' && *endp != '\\')
 		endp--;
 
 	/* Either the dir is "/" or there are no slashes */
