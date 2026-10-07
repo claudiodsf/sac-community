@@ -177,6 +177,21 @@ start-up.  This is the way to script SAC on Windows:
 Put one command per line in the macro and finish with `quit`, so that SAC exits
 with status 0; a non-zero status means a command failed.
 
+Interactive commands that read the cursor, such as `ppk`, work too.  When one
+starts, the plot window is brought to the front and takes the keyboard; move the
+mouse to the pick position on the trace and type the single-character response
+in the **plot window**, not the console.  The pick location is the pointer
+position at the moment the key is pressed.  When the command finishes, click the
+console again to type further SAC commands.  Because `ppk` waits for keystrokes,
+it cannot be run from a macro unattended.
+
+Closing a plot window does **not** end the SAC session.  The window is hidden and
+the next plotting command re-opens it; closing it while a picking command is
+waiting ends that command and returns to the prompt.
+
+Plot windows open at three quarters of the usable screen, centred, rather than
+at a fixed small size.
+
 Two caveats:
 
 * Piping commands in does not work — SAC reads its input through the Windows

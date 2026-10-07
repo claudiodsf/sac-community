@@ -6,6 +6,11 @@
 
 #define WIN_COLOR_MAXIMUM 255
 
+/* Posted to a plot window to make it the foreground, focused window.  The
+ * command thread posts this when it starts reading cursor input, because
+ * keyboard events only reach the focused window. */
+#define SAC_WINDOW_FOCUS (WM_APP + 3)
+
 struct _SacColor {
     float red, green, blue;
 };
@@ -81,6 +86,21 @@ struct _SacView {
     int          width;
     int          id;
     HWND         window_handle;
+    /* Drawing objects are appended from the thread running SAC commands (the
+     * console thread, or the main thread when a macro runs at start-up) but
+     * the window is painted from the GUI thread on WM_PAINT, so every access
+     * to objs/n has to be serialised.  CRITICAL_SECTION is re-entrant, which
+     * matters because SacViewAdd() calls SacViewClear() and then
+     * SacViewAddObject() for an SV_Begin. */
+    CRITICAL_SECTION lock;
+
+    /* Interactive cursor input (ppk and other picking commands).  The command
+     * thread blocks on key_event; the window procedure records the character
+     * typed in the plot window and signals the event. */
+    HANDLE          key_event;      /* auto-reset, signalled once per key */
+    char            key_char;       /* character of the waiting key press */
+    volatile int    key_ready;      /* non-zero once key_char is valid */
+    volatile int    cursor_active;  /* non-zero while a command waits for a key */
 };
 typedef struct _SacView SacView;
 

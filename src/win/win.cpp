@@ -103,11 +103,44 @@ SacWindowAdd(int id) {
     }
 }
 
+/* Pick a default size and position for a new plot window: three quarters of the
+ * usable screen, so that plots are readable without being resized first, but
+ * never larger than the work area (which excludes the taskbar). */
+static void
+SacWindowDefaultGeometry(int id, int *x, int *y, int *width, int *height) {
+    RECT work;
+    int work_w, work_h;
+
+    /* Fall back to the primary screen if the work area is unavailable. */
+    work.left = 0;
+    work.top = 0;
+    work.right = GetSystemMetrics(SM_CXSCREEN);
+    work.bottom = GetSystemMetrics(SM_CYSCREEN);
+    SystemParametersInfo(SPI_GETWORKAREA, 0, &work, 0);
+
+    work_w = work.right - work.left;
+    work_h = work.bottom - work.top;
+
+    *width = (int) (work_w * 0.75);
+    *height = (int) (work_h * 0.75);
+    if (*width < 640) {
+        *width = (work_w < 640) ? work_w : 640;
+    }
+    if (*height < 480) {
+        *height = (work_h < 480) ? work_h : 480;
+    }
+
+    /* Centre the window, offsetting each extra window so they do not stack. */
+    *x = work.left + (work_w - *width) / 2 + (id - 1) * 24;
+    *y = work.top + (work_h - *height) / 2 + (id - 1) * 24;
+}
+
 SacView * 
 SacWindow(int id) {
     SacView *view;
     HWND hwnd;
     TCHAR title[100];
+    int x, y, width, height;
     int n;
 
     memset(&title[0], 0, 100);
@@ -118,11 +151,13 @@ SacWindow(int id) {
     n = snprintf(&title[0], 100, "Sac Plot Window: %d", id);
 #endif
 
+    SacWindowDefaultGeometry(id, &x, &y, &width, &height);
+
     hwnd = CreateWindow(Application, 
                         title,
                         WS_OVERLAPPEDWINDOW,
-                        CW_USEDEFAULT, CW_USEDEFAULT, 
-                        400, 300,
+                        x, y, 
+                        width, height,
                         NULL,NULL,
                         NULL,//hInstance,
                         NULL);
@@ -315,10 +350,44 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
             fprintf(stderr, "View undefined\n");
         }
         break;
+    case WM_CHAR:
+        /* A key typed in the plot window while a picking command is waiting.
+         * Record it and wake the command thread blocked in win_cursor(). */
+        view = SacViewWindowsGetByHandle(wins, hwnd);
+        if(view && view->cursor_active) {
+            view->key_char = (char) wparam;
+            view->key_ready = 1;
+            SetEvent(view->key_event);
+            return 0;
+        }
+        break;
+    case SAC_WINDOW_FOCUS:
+        SetForegroundWindow(hwnd);
+        SetFocus(hwnd);
+        break;
+    case WM_CLOSE:
+        /* Closing a plot window must not end the SAC session.  Hide the window
+         * instead; the next frame re-opens it (see win_begin_frame).  If a
+         * picking command is waiting for a key, release it so it returns to
+         * the command level instead of waiting on an invisible window. */
+        view = SacViewWindowsGetByHandle(wins, hwnd);
+        if(view && view->cursor_active) {
+            view->key_char = 'Q';
+            view->key_ready = 1;
+            SetEvent(view->key_event);
+        }
+        ShowWindow(hwnd, SW_HIDE);
+        return 0;
     case WM_DESTROY:
+        /* No PostQuitMessage()/TerminateThread() here: destroying one plot
+         * window must not terminate SAC.  Just release a waiting cursor. */
         DEBUG("WINDOW DESTORY\n");
-        PostQuitMessage(0);
-        TerminateThread(&ThreadId, 0);
+        view = SacViewWindowsGetByHandle(wins, hwnd);
+        if(view && view->cursor_active) {
+            view->key_char = 'Q';
+            view->key_ready = 1;
+            SetEvent(view->key_event);
+        }
         break;
         
     default:

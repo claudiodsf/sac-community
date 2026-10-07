@@ -145,6 +145,13 @@ void
 win_begin_frame(int *nerr) {
     DEBUG("\n");
     *nerr = 0;
+    /* The user may have closed the plot window; closing does not end the
+     * session, it only hides the window.  Re-open it rather than draw into an
+     * invisible window. */
+    if (current_view && current_view->window_handle &&
+        !IsWindowVisible(current_view->window_handle)) {
+        SacWindowShow(current_view);
+    }
     SacViewAdd(current_view, SV_Begin);
 }
 
@@ -355,9 +362,74 @@ win_alpha_info(int *num_lines, char erase[], int erase_length) {
 
 void
 win_cursor(float *x, float *y, char c[], int length) {
-    //win_wait_for_keypress(x,y,c);
-    *x = win_to_view_x(*x);
-    *y = win_to_view_y(*y);
+    SacView *view = current_view;
+    POINT p;
+    MSG msg;
+
+    UNUSED(length);
+
+    if (!view) {
+        return;
+    }
+
+    /* If the plot window was closed while this frame was being drawn there is
+     * nothing to pick on, so return to the command level instead of waiting on
+     * an invisible window. */
+    if (!view->window_handle || !IsWindowVisible(view->window_handle)) {
+        c[0] = 'Q';
+        return;
+    }
+
+    /* Keyboard input only reaches the focused window, so bring the plot window
+     * to the foreground while we wait for a key.  Handled on the GUI thread,
+     * which owns the window. */
+    PostMessage(view->window_handle, SAC_WINDOW_FOCUS, 0, 0);
+
+    view->key_ready = 0;
+    view->cursor_active = 1;
+
+    if (GetWindowThreadProcessId(view->window_handle, NULL) ==
+        GetCurrentThreadId()) {
+        /* The plot window belongs to this thread, so ppk was started from a
+         * macro given on the command line and the main message loop is not
+         * running yet.  Pump messages here, otherwise no WM_CHAR would ever be
+         * delivered and the window would appear frozen. */
+        while (!view->key_ready) {
+            if (GetMessage(&msg, NULL, 0, 0) <= 0) {
+                break;
+            }
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    } else {
+        WaitForSingleObject(view->key_event, INFINITE);
+    }
+
+    view->cursor_active = 0;
+
+    if (!view->key_ready) {
+        /* The window went away (WM_QUIT/WM_DESTROY): make the caller return to
+         * the command level rather than spin. */
+        c[0] = 'Q';
+        return;
+    }
+
+    /* Report the pointer position at the moment the key was pressed, the way
+     * the X11 and macOS backends do.  View coordinates run 0..1 with the
+     * origin at the bottom left; the drawing code maps them to client pixels
+     * as (x * width, (1 - y) * height). */
+    if (GetCursorPos(&p) && ScreenToClient(view->window_handle, &p)) {
+        RECT rect;
+        if (GetClientRect(view->window_handle, &rect) &&
+            rect.right > rect.left && rect.bottom > rect.top) {
+            *x = (float) (p.x - rect.left) / (float) (rect.right - rect.left);
+            *y = 1.0f -
+                 (float) (p.y - rect.top) / (float) (rect.bottom - rect.top);
+        }
+    }
+
+    c[0] = view->key_char;
+    view->key_ready = 0;
 }
 
 void

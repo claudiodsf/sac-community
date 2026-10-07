@@ -259,9 +259,20 @@ SacViewInit() {
         s->color = MakeColor(0, 0, 0);
         s->width = 1;
         s->id = -1;
+        s->key_event = CreateEvent(NULL, FALSE, FALSE, NULL);
+        s->key_char = 0;
+        s->key_ready = 0;
+        s->cursor_active = 0;
+        InitializeCriticalSection(&s->lock);
     }
     return s;
 }
+
+/* Upper bound on the number of drawing objects retained for one frame.  The
+ * view is retained-mode: objects accumulate until the next SV_Begin clears
+ * them, so a command that keeps drawing without starting a new frame would
+ * otherwise grow the list until the allocator gives up. */
+#define SAC_VIEW_MAX_OBJECTS (1 << 20)
 
 void
 SacViewAddObject(SacView * view, SacViewObj * obj) {
@@ -270,29 +281,59 @@ SacViewAddObject(SacView * view, SacViewObj * obj) {
         fprintf(stderr, "view undefined\n");
         return;
     }
+    EnterCriticalSection(&view->lock);
     if (!view->objs) {
+        int alloc = 4;
+        SacViewObj **objs =
+            (SacViewObj **) malloc(sizeof(SacViewObj *) * alloc);
+        if (!objs) {
+            fprintf(stderr, "Error allocating space for Drawing Object\n");
+            LeaveCriticalSection(&view->lock);
+            return;
+        }
         view->n = 0;
-        view->alloc = 4;
-        view->objs = (SacViewObj **) malloc(sizeof(SacViewObj *) * view->alloc);
+        view->alloc = alloc;
+        view->objs = objs;
     }
+    if (view->n >= SAC_VIEW_MAX_OBJECTS) {
+        static int warned = 0;
+        if (!warned) {
+            warned = 1;
+            fprintf(stderr,
+                    "Too many drawing objects in one frame (%d); the rest are "
+                    "discarded\n",
+                    SAC_VIEW_MAX_OBJECTS);
+        }
+        SacViewObjectFree(obj);
+        LeaveCriticalSection(&view->lock);
+        return;
+    }
+    /* Grow by allocating first and only then committing the new size.  The
+     * previous version doubled view->alloc before calling realloc, so a failed
+     * realloc left alloc larger than the buffer and later appends wrote past
+     * the end of it. */
     if (view->n + 1 >= view->alloc) {
-        view->alloc *= 2;
-        tmp =
-            (SacViewObj **) realloc(view->objs,
-                                    sizeof(SacViewObj *) * view->alloc);
+        int alloc = view->alloc * 2;
+        tmp = (SacViewObj **) realloc(view->objs,
+                                      sizeof(SacViewObj *) * alloc);
         if (!tmp) {
             fprintf(stderr, "Error allocating space for Drawing Object\n");
+            SacViewObjectFree(obj);
+            LeaveCriticalSection(&view->lock);
             return;
         }
         view->objs = tmp;
+        view->alloc = alloc;
     }
     view->objs[view->n] = obj;
     view->n += 1;
+    LeaveCriticalSection(&view->lock);
 }
 
 void
 SacViewClear(SacView * view) {
     int i;
+    EnterCriticalSection(&view->lock);
     if (view->objs) {
         for (i = 0; i < view->n; i++) {
             SacViewObjectFree(view->objs[i]);
@@ -303,10 +344,14 @@ SacViewClear(SacView * view) {
     view->objs = NULL;
     view->n = 0;
     view->alloc = 0;
+    LeaveCriticalSection(&view->lock);
 }
 
 void
 SacViewUpdate(SacView * view) {
+    if (!view || !view->window_handle) {
+        return;
+    }
     InvalidateRect(view->window_handle, NULL, TRUE);
 }
 
@@ -390,6 +435,9 @@ SacViewDraw(SacView * view) {
 
     hdc = BeginPaint(view->window_handle, &ps);
 
+    /* Hold the lock for the whole traversal: the objects and their point
+     * arrays are freed by SacViewClear() on the command thread. */
+    EnterCriticalSection(&view->lock);
     for (i = 0; i < view->n; i++) {
         obj = view->objs[i];
         switch (obj->type) {
@@ -443,6 +491,7 @@ SacViewDraw(SacView * view) {
                 break;
         }
     }
+    LeaveCriticalSection(&view->lock);
     EndPaint(view->window_handle, &ps);
 }
 
