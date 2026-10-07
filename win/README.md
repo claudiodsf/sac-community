@@ -46,7 +46,9 @@ cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-This produces `build/sac.exe`, with `sacaux/` staged next to it.
+This produces `build/sac.exe` and the eight `utils/` programs (`sgftops`,
+`sgfswap`, `saclst`, `sacswap`, `sacset`, `sacdiff`, `bbfswap` and `unvis`),
+with `sacaux/` staged next to `sac.exe`.
 
 ## Running
 
@@ -82,6 +84,8 @@ writes `sac-<version>-windows-<arch>.zip`, containing:
 
 ```
 sac.exe        statically linked against libxml2, zlib and curl
+*.exe          the eight utils/ programs (sgftops, sgfswap, saclst, sacswap,
+               sacset, sacdiff, bbfswap, unvis)
 sacaux/        the auxiliary data (colour tables, help, ...)
 libc++.dll     the only non-system runtime dependency
 libunwind.dll
@@ -102,6 +106,7 @@ archive.
 | `SAC_GUI_SUBSYSTEM` | `OFF` | Link as a Windows GUI subsystem application. `win.cpp` then uses its `WinMain()` entry point, which calls `AllocConsole()` and detaches SAC from the terminal that started it — the behaviour of the old Visual Studio build. |
 | `SAC_SACAUX` | `<prefix>/sacaux` | Directory compiled in as the default `SACAUX`. |
 | `SAC_STAGE_AUX` | `ON` | Copy `sacaux/` next to the executable after building. |
+| `SAC_BUILD_UTILS` | `ON` | Also build the `utils/` programs (see below). |
 
 ## What is in this directory
 
@@ -113,6 +118,32 @@ archive.
 | `patches/` | Patches applied to the vendored libraries at build time (below). |
 | `gen-sources.ps1` | Generates `sources.cmake` from `src/Makefile.am`. |
 | `sources.cmake` | Generated list of the sources that make up the SAC program and its libraries. Do not edit by hand. |
+
+## Utility programs
+
+The autotools build builds the programs in `utils/` (they are in its
+`SUBDIRS`), and so does this one:
+
+| Program | Purpose |
+| --- | --- |
+| `sgftops` | Convert a SAC Graphics Format (`.sgf`) file to PostScript. |
+| `sgfswap` | Byte-swap an `.sgf` file. |
+| `saclst` | List SAC header values. |
+| `sacset` | Change SAC header values. |
+| `sacdiff` | Compare two SAC files. |
+| `sacswap` | Byte-swap a SAC file. |
+| `bbfswap` | Byte-swap a blackboard variable file. |
+| `unvis` | Decode a `VIS`-encoded text stream. |
+
+`sgftops` matters at run time: SAC's `print`/PostScript path runs
+`sgftops <in.sgf> <out.ps>` as an external command (`src/gam/xprint.c`), so
+`sgftops.exe` has to be on `PATH` (or in the working directory) for that to
+work.
+
+`saclst`, `sacset`, `sacdiff`, `sacswap` and `bbfswap` link against sacio, as
+their autotools counterparts link against `src/libsacio.a`. That library is
+`sacio` plus `src/ucf/distaz.c` (`sacio.c`'s `update_distaz()` calls it),
+`src/co/math.c` and `src/vars/bbf.c`; the `sacio_sac` target reproduces it.
 
 ## Source lists
 
@@ -131,9 +162,9 @@ defines `main()` and its own `error()`, which collides with SAC's.
 
 ## Patched vendored libraries
 
-`fern`, `libmseed`, `evalresp` (including its bundled `mxml`) and `sacio`'s
-`time64` are third party code and are kept byte for byte identical to upstream.
-Where Windows needs a change the component is copied into the build tree and the
+`fern`, `libmseed`, `evalresp` (including its bundled `mxml`) and `sacio` are
+third party code and are kept byte for byte identical to upstream.  Where
+Windows needs a change the component is copied into the build tree and the
 matching patch in `patches/` is applied to the copy. If a vendored library is
 updated and the patched lines move, the build stops and names the patch that
 needs refreshing, rather than silently dropping the fix.
@@ -144,6 +175,10 @@ needs refreshing, rather than silently dropping the fix.
 | `fern-arg-double.patch` | Renames the `DOUBLE` enumerator: Windows has `typedef double DOUBLE` in `wtypesbase.h`. |
 | `mxml-ssize_t.patch` | Only typedefs `ssize_t` where the CRT really lacks it; MinGW already defines it. |
 | `time64-prid64.patch` | Adds spaces around `PRId64`. Clang lexes the macro body before expansion in C++11 and rejects a literal followed directly by an identifier. |
+| `sacio-binary-mode.patch` | Opens the binary SAC files written by `sacio.c` in binary mode (`"wb"`/`"r+b"`). Upstream's `"w"`/`"r+"` mean the same thing on POSIX, but on Windows they enable `\n` -> `\r\n` translation, which corrupted every file written by `write` (an extra byte per `0x0a` in the data) so that SAC could not read its own output back. |
+
+`sacio` is compiled from the patched copy, not from the source tree, because
+this patch changes one of its `.c` files and not just a header.
 
 Should a patch be rejected, refresh it with:
 

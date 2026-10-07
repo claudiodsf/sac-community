@@ -189,7 +189,8 @@ endfunction()
 sac_patch_component(libmseed                libmseed-stat.patch)
 sac_patch_component(fern                    fern-arg-double.patch)
 sac_patch_component(evalresp/libsrc/mxml   mxml-ssize_t.patch)
-sac_patch_component(sacio                   time64-prid64.patch)
+sac_patch_component(sacio                   time64-prid64.patch
+                                            sacio-binary-mode.patch)
 
 # ---------------------------------------------------------------------------
 # In-tree support libraries
@@ -221,10 +222,12 @@ file(GLOB LIBMSDEED_SOURCES CONFIGURE_DEPENDS "${SAC_PATCH_ROOT}/libmseed/*.c")
 add_library(mseed STATIC ${LIBMSDEED_SOURCES})
 target_include_directories(mseed PUBLIC "${PROJECT_SOURCE_DIR}/libmseed")
 
-# sacio
-file(GLOB SACIO_SOURCES CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/sacio/*.c")
+# sacio.  Compiled from the patched copy (see the vendored patches above):
+# sacio-binary-mode.patch changes sacio.c itself, so the sources -- not just the
+# headers -- have to come from the patched tree.
+file(GLOB SACIO_SOURCES CONFIGURE_DEPENDS "${SAC_PATCH_ROOT}/sacio/*.c")
 add_library(sacio_bsd STATIC ${SACIO_SOURCES})
-target_include_directories(sacio_bsd PUBLIC "${PROJECT_SOURCE_DIR}/sacio")
+target_include_directories(sacio_bsd PUBLIC "${SAC_PATCH_ROOT}/sacio")
 
 # fern.  These are the explicit lists from fern/Makefile.am, not a glob: the
 # directory also contains fern.c, the standalone command line program (it
@@ -361,6 +364,46 @@ if(MINGW)
 endif()
 
 # ---------------------------------------------------------------------------
+# Utility programs (utils/)
+#
+# The autotools build has utils in SUBDIRS and installs these eight
+# bin_PROGRAMS.  The Windows build produces them too: SAC itself shells out to
+# "sgftops" to turn a .sgf file into PostScript (src/gam/xprint.c), so the
+# program has to be on PATH for SAC's print/PostScript output to work.
+# ---------------------------------------------------------------------------
+option(SAC_BUILD_UTILS "Also build the utils/ command line programs" ON)
+
+set(SAC_UTILS_PROGRAMS sgftops sgfswap saclst sacswap sacset sacdiff bbfswap unvis)
+# These read and write SAC files through sacio; the other three are standalone
+# (sgftops and sgfswap touch .sgf files, unvis is a text tool).
+set(SAC_UTILS_WITH_SACIO saclst sacswap sacset sacdiff bbfswap)
+
+if(SAC_BUILD_UTILS)
+    # The autotools build links the utils against ../src/libsacio.a, which is
+    # sacio_bsd plus the three sources below (src/Makefile.am:
+    # libsacio_a_SOURCES = ucf/distaz.c co/math.c vars/bbf.c).  distaz() is
+    # required because sacio.c's update_distaz() calls it, and bbf.c backs
+    # bbfswap.  win_compat supplies localtime_r(), which sacio's time64.c uses.
+    add_library(sacio_sac STATIC
+        "${PROJECT_SOURCE_DIR}/src/ucf/distaz.c"
+        "${PROJECT_SOURCE_DIR}/src/co/math.c"
+        "${PROJECT_SOURCE_DIR}/src/vars/bbf.c")
+    target_include_directories(sacio_sac PUBLIC ${SAC_INCLUDE_DIRS})
+    target_link_libraries(sacio_sac PUBLIC sacio_bsd win_compat)
+
+    foreach(_prog ${SAC_UTILS_PROGRAMS})
+        add_executable(${_prog} "${PROJECT_SOURCE_DIR}/utils/${_prog}.c")
+        target_include_directories(${_prog} PRIVATE ${SAC_INCLUDE_DIRS})
+        if(_prog IN_LIST SAC_UTILS_WITH_SACIO)
+            target_link_libraries(${_prog} PRIVATE sacio_sac)
+        endif()
+        if(MINGW)
+            target_link_options(${_prog} PRIVATE -static -static-libgcc)
+        endif()
+    endforeach()
+endif()
+
+# ---------------------------------------------------------------------------
 # Stage the auxiliary data next to the executable so the build tree is usable
 # as-is (this is what win/build_win.bat used to do by hand).
 # ---------------------------------------------------------------------------
@@ -376,6 +419,9 @@ endif()
 # Installation
 # ---------------------------------------------------------------------------
 install(TARGETS sac RUNTIME DESTINATION bin)
+if(SAC_BUILD_UTILS)
+    install(TARGETS ${SAC_UTILS_PROGRAMS} RUNTIME DESTINATION bin)
+endif()
 install(DIRECTORY "${PROJECT_SOURCE_DIR}/sacaux" DESTINATION .)
 
 # ---------------------------------------------------------------------------
@@ -386,6 +432,18 @@ install(DIRECTORY "${PROJECT_SOURCE_DIR}/sacaux" DESTINATION .)
 # ---------------------------------------------------------------------------
 set(SAC_DIST_DIR "${CMAKE_BINARY_DIR}/dist")
 set(SAC_DIST_NAME "sac-${PROJECT_VERSION}-windows-${CMAKE_SYSTEM_PROCESSOR}")
+
+# The utils programs ship next to sac.exe.  sgftops is looked up through PATH
+# (SAC runs "sgftops ..." with system()), so it has to be reachable from there.
+set(SAC_DIST_UTIL_STEPS "")
+set(SAC_DIST_DEPENDS sac)
+if(SAC_BUILD_UTILS)
+    foreach(_prog ${SAC_UTILS_PROGRAMS})
+        list(APPEND SAC_DIST_UTIL_STEPS
+            COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:${_prog}>" "${SAC_DIST_DIR}/")
+        list(APPEND SAC_DIST_DEPENDS ${_prog})
+    endforeach()
+endif()
 
 # Everything sac.exe needs is either a Windows system DLL or linked in
 # statically, except libc++: MSYS2 builds it as a DLL and the compiler adds its
@@ -402,6 +460,7 @@ add_custom_target(dist
     COMMAND "${CMAKE_COMMAND}" -E remove_directory "${SAC_DIST_DIR}"
     COMMAND "${CMAKE_COMMAND}" -E make_directory "${SAC_DIST_DIR}"
     COMMAND "${CMAKE_COMMAND}" -E copy "$<TARGET_FILE:sac>" "${SAC_DIST_DIR}/"
+    ${SAC_DIST_UTIL_STEPS}
     COMMAND "${CMAKE_COMMAND}" -E copy_if_different ${SAC_RUNTIME_DLLS} "${SAC_DIST_DIR}/"
     COMMAND "${CMAKE_COMMAND}" -E copy_directory
             "${PROJECT_SOURCE_DIR}/sacaux" "${SAC_DIST_DIR}/sacaux"
@@ -409,6 +468,6 @@ add_custom_target(dist
     COMMAND "${CMAKE_COMMAND}" -E copy "${PROJECT_SOURCE_DIR}/README.md" "${SAC_DIST_DIR}/"
     COMMAND "${CMAKE_COMMAND}" -E tar cf "${CMAKE_BINARY_DIR}/${SAC_DIST_NAME}.zip"
             --format=zip -- "${SAC_DIST_DIR}"
-    DEPENDS sac
+    DEPENDS ${SAC_DIST_DEPENDS}
     COMMENT "Assembling ${SAC_DIST_NAME}.zip"
     VERBATIM)

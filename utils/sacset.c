@@ -36,6 +36,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <limits.h>
 #include <string.h>
 
+/* strcasestr() is a GNU extension and is not available on Windows/MinGW, so
+ * carry a small portable version here. */
+static char *
+sac_strcasestr(const char *haystack, const char *needle) {
+    size_t nlen = strlen(needle);
+    if(nlen == 0) {
+        return (char *) haystack;
+    }
+    for(; *haystack; haystack++) {
+        if(strncasecmp(haystack, needle, nlen) == 0) {
+            return (char *) haystack;
+        }
+    }
+    return NULL;
+}
+
 
 int
 bool_type(char *val) {
@@ -103,7 +119,7 @@ main(int argc, char *argv[]) {
         if(strcmp(argv[i], "-v") == 0 ||
            strcmp(argv[i], "--verbose") == 0) {
             verbose = 1;
-        } else if(strcasestr(argv[i], "-nvhdr") != NULL) {
+        } else if(sac_strcasestr(argv[i], "-nvhdr") != NULL) {
             // Read and Write the full file
             // Set function pointers to sac_read() and sac_write()
             readf  = sac_read;

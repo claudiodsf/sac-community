@@ -1,0 +1,16 @@
+diff --git a/sacio/sacio.c b/sacio/sacio.c
+index 5698f75..999e701 100644
+--- a/sacio/sacio.c
++++ b/sacio/sacio.c
+@@ -2521,9 +2521,9 @@ sac_write_internal(sac *s, char *filename, int write_data, int swap, int *nerr)
+ 
+     
+     if(write_data) {
+-        fp = fopen(filename, "w"); // Truncate or create
++        fp = fopen(filename, "wb"); // Truncate or create
+     } else {
+-        fp = fopen(filename, "r+"); // Open for reading and writing
++        fp = fopen(filename, "r+b"); // Open for reading and writing
+         swap = s->m->swap;
+     }
+     if(! fp) {
