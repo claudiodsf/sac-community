@@ -1,0 +1,113 @@
+/*
+ * config.h for the CMake Windows build.
+ *
+ * Historically this file was hand-maintained twice: as inc/config_win.h for
+ * MSVC and as an autoconf-generated header for MinGW/Cygwin.  CMake now
+ * generates it for every Windows toolchain from this single template.
+ *
+ * Note that the value of the HAVE_FUNC_* / MISSING_FUNC_* pairs differs
+ * between MSVC and MinGW: MSVC has no vasprintf/snprintf and needs the
+ * fallbacks in the C library, whereas MinGW/Clang provides them.
+ */
+#ifndef SAC_CONFIG_H
+#define SAC_CONFIG_H
+
+/* Package identification ------------------------------------------------ */
+#define PACKAGE           "sac"
+#define PACKAGE_NAME      "SAC Community Edition"
+#define PACKAGE_TARNAME   "sac"
+#define PACKAGE_VERSION   "@PROJECT_VERSION@"
+#define PACKAGE_STRING    "SAC Community Edition @PROJECT_VERSION@"
+#define PACKAGE_BUGREPORT "https://github.com/earthscope/sac-community"
+#define VERSION           "@PROJECT_VERSION@"
+
+/* Build identification -------------------------------------------------- */
+#define BUILD_DATE "@SAC_BUILD_DATE@"
+
+/* Where the auxiliary data lives.  Overridden at run time by $SACAUX. */
+#define SACAUX "@SAC_SACAUX@"
+
+/* Windows --------------------------------------------------------------- */
+#define WIN_APP 1
+#cmakedefine MINGW 1
+/* Build the windowed front end (src/win/win.cpp) rather than a console-only
+ * binary; this selects WinMain() and the GUI subsystem. */
+#cmakedefine GUI_APP 1
+
+/* Optional features ----------------------------------------------------- */
+#cmakedefine HAVE_LIBM 1
+#cmakedefine HAVE_ZLIB 1
+#cmakedefine HAVE_XML 1
+#cmakedefine HAVE_LIBCURL 1
+
+/* Databases are not available on Windows. */
+#cmakedefine DATABASE_DISABLED 1
+#cmakedefine HAVE_LIBRPC_DISABLED 1
+
+/* Headers --------------------------------------------------------------- */
+#cmakedefine HAVE_INTTYPES_H 1
+#cmakedefine HAVE_LIMITS_H 1
+#cmakedefine HAVE_STDINT_H 1
+#cmakedefine HAVE_STDIO_H 1
+#cmakedefine HAVE_STDLIB_H 1
+#cmakedefine HAVE_STRINGS_H 1
+#cmakedefine HAVE_STRING_H 1
+#cmakedefine HAVE_SYS_STAT_H 1
+#cmakedefine HAVE_SYS_TYPES_H 1
+#cmakedefine HAVE_UNISTD_H 1
+#cmakedefine STDC_HEADERS 1
+
+/* Functions the C library provides -------------------------------------- */
+#cmakedefine HAVE_FUNC_FMAX 1
+#cmakedefine HAVE_FUNC_FMIN 1
+#cmakedefine HAVE_FUNC_LROUND 1
+#cmakedefine HAVE_FUNC_PUTENV 1
+#cmakedefine HAVE_FUNC_SLEEP 1
+#cmakedefine HAVE_FUNC_STRTOF 1
+#cmakedefine HAVE_FUNC_TOLOWER 1
+#cmakedefine HAVE_FUNC_TOUPPER 1
+#cmakedefine HAVE_FUNC_VASPRINTF 1
+
+/* Functions that must be provided by SAC ---------------------------------
+ *
+ * MinGW-w64 does not provide these; SAC carries portable replacements for
+ * all of them (declarations in inc/string_utils.h, definitions in
+ * src/string/strings.c, and basename/dirname in src/dfm/readfl.c).
+ *
+ * Note that asprintf/vasprintf/strsep are NOT in this list: libmingwex does
+ * provide them, they are simply hidden behind _GNU_SOURCE, which the build
+ * defines (see CMakeLists.txt).
+ */
+#cmakedefine MISSING_FUNC_MKSTEMPS 1
+#cmakedefine MISSING_FUNC_INDEX 1
+#cmakedefine MISSING_FUNC_RINDEX 1
+#cmakedefine MISSING_FUNC_STRLCPY 1
+#cmakedefine MISSING_FUNC_STRLCAT 1
+#cmakedefine MISSING_FUNC_BASENAME 1
+#cmakedefine MISSING_FUNC_DIRNAME 1
+#cmakedefine MISSING_FUNC_BZERO 1
+#cmakedefine MISSING_FUNC_FMEMOPEN 1
+#cmakedefine MISSING_FUNC_WORDEXP 1
+
+/* libcurl capabilities --------------------------------------------------- */
+#cmakedefine LIBCURL_FEATURE_ASYNCHDNS 1
+#cmakedefine LIBCURL_FEATURE_IDN 1
+#cmakedefine LIBCURL_FEATURE_IPV6 1
+#cmakedefine LIBCURL_FEATURE_LIBZ 1
+#cmakedefine LIBCURL_FEATURE_SSL 1
+#cmakedefine LIBCURL_FEATURE_SSPI 1
+#cmakedefine LIBCURL_PROTOCOL_DICT 1
+#cmakedefine LIBCURL_PROTOCOL_FILE 1
+#cmakedefine LIBCURL_PROTOCOL_FTP 1
+#cmakedefine LIBCURL_PROTOCOL_FTPS 1
+#cmakedefine LIBCURL_PROTOCOL_HTTP 1
+#cmakedefine LIBCURL_PROTOCOL_HTTPS 1
+#cmakedefine LIBCURL_PROTOCOL_IMAP 1
+#cmakedefine LIBCURL_PROTOCOL_LDAP 1
+#cmakedefine LIBCURL_PROTOCOL_POP3 1
+#cmakedefine LIBCURL_PROTOCOL_RTSP 1
+#cmakedefine LIBCURL_PROTOCOL_SMTP 1
+#cmakedefine LIBCURL_PROTOCOL_TELNET 1
+#cmakedefine LIBCURL_PROTOCOL_TFTP 1
+
+#endif /* SAC_CONFIG_H */

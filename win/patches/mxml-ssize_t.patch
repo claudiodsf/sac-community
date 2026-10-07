@@ -1,0 +1,15 @@
+diff --git a/evalresp/libsrc/mxml/zipc.h b/evalresp/libsrc/mxml/zipc.h
+index 580404a..fbdc65b 100644
+--- a/evalresp/libsrc/mxml/zipc.h
++++ b/evalresp/libsrc/mxml/zipc.h
+@@ -42,7 +42,9 @@
+  * Types...
+  */
+ 
+-#  ifdef WIN32
++/* NOTE (SAC Windows build): MinGW-w64 already defines ssize_t (as long long)
++ * in <sys/types.h>, so only define it where the CRT really lacks it. */
++#  if defined(WIN32) && !defined(__MINGW32__)
+ typedef long ssize_t;
+ #  endif /* WIN32 */
+ 

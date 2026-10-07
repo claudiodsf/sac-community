@@ -1,0 +1,13 @@
+diff --git a/sacio/time64.h b/sacio/time64.h
+index a55fd45..c817bb1 100644
+--- a/sacio/time64.h
++++ b/sacio/time64.h
+@@ -125,7 +125,7 @@ Time64_T   timelocal64   (struct TM *);
+ 
+ /* Use a different asctime format depending on how big the year is */
+ #ifdef USE_TM64
+-    #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %"PRId64"\n"
++    #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %" PRId64 "\n"
+ #else
+     #define TM64_ASCTIME_FORMAT "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n"
+ #endif

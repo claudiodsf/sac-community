@@ -1,0 +1,47 @@
+diff --git a/fern/request.c b/fern/request.c
+index 32e5d1b..8be50a6 100644
+--- a/fern/request.c
++++ b/fern/request.c
+@@ -656,10 +656,14 @@ request_url_get(char *url, int progress) {
+ }
+ 
+ 
++/* NOTE (SAC Windows build): the second enumerator is ARG_DOUBLE rather than
++ * DOUBLE because the Windows headers (wtypesbase.h) contain
++ * `typedef double DOUBLE`, which an enumerator of the same name collides
++ * with. */
+ enum {
+     ARG_NONE = 0,
+     INTEGER = 1,
+-    DOUBLE = 2,
++    ARG_DOUBLE = 2,
+     STRING = 3,
+     DATA = 4,
+     TIME = 5,
+@@ -690,7 +694,7 @@ arg_to_string(Arg *p, char *dst, size_t n) {
+ 
+     switch(p->type) {
+     case INTEGER:  snprintf(dst, n, "%d", p->i); break;
+-    case DOUBLE:   snprintf(dst, n, "%f", p->fp); break;
++    case ARG_DOUBLE:   snprintf(dst, n, "%f", p->fp); break;
+     case STRING:   snprintf(dst, n, "%s", p->str); break;
+     case DATA:     p->data_fmt(p->data, dst, n); break;
+     case TIME:     strftime64t(dst, n, "%FT%T", &p->t); break;
+@@ -714,7 +718,7 @@ arg_free(void *v) {
+         switch(p->type) {
+         case ARG_NONE: break;
+         case INTEGER:  break;
+-        case DOUBLE:   break;
++        case ARG_DOUBLE:   break;
+         case TIME:     break;
+         case STRING:   FREE(p->str); break;
+         case DATA:     p->data_free(p->data); break;
+@@ -777,7 +781,7 @@ Arg * arg_data_new(void *data,
+  */
+ Arg * arg_double_new(double v) {
+     Arg *d = arg_new();
+-    d->type = DOUBLE;
++    d->type = ARG_DOUBLE;
+     d->fp   = v;
+     return d;
+ }

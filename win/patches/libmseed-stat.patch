@@ -1,0 +1,18 @@
+diff --git a/libmseed/libmseed.h b/libmseed/libmseed.h
+index 00e8f14..79ee61e 100644
+--- a/libmseed/libmseed.h
++++ b/libmseed/libmseed.h
+@@ -129,8 +129,11 @@ typedef unsigned __int64 uint64_t;
+ #define _fseeki64 fseeko64
+ #define _ftelli64 ftello64
+ 
+-#define fstat _fstat
+-#define stat _stat
++/* NOTE (SAC Windows build): the fstat/stat macros are deliberately NOT
++ * defined.  MinGW already provides both as POSIX aliases, and defining them as
++ * macros rewrites `struct stat` / `struct fstat` inside <sys/stat.h> into
++ * `struct _stat64i32` / `struct _fstat64i32`, colliding with the declarations
++ * a few lines above. */
+ #endif
+ #else
+ /* All other platforms */

@@ -70,7 +70,10 @@ struct __bbf {
 };
 
 void bbf_verbose(int v);
-int bbf_error(int errno, char *fmt, ...);
+/* NOTE: the first parameter used to be named "errno", which is a macro on
+ * both glibc and MinGW; expanding it turned the parameter type into a
+ * function pointer.  Keep this name. */
+int bbf_error(int errnum, char *fmt, ...);
 
 bbf *bbf_new();
 void bbf_free(bbf * b);

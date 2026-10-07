@@ -835,7 +835,10 @@ strsep(char **stringp, const char *delim) {
 #include <unistd.h>
 #endif
 
-#ifdef WIN32
+/* MSVC has no mode_t and no S_IRUSR/S_IWUSR.  MinGW-w64 is the opposite:
+ * <sys/types.h> defines mode_t and <sys/stat.h> defines S_IRUSR/S_IWUSR, so
+ * defining them here would collide. */
+#if defined(WIN32) && !defined(__MINGW32__)
 typedef int mode_t;
 static const mode_t S_IRUSR = (mode_t) (_S_IREAD);      ///< read by user
 static const mode_t S_IWUSR = (mode_t) (_S_IWRITE);     ///< write by user

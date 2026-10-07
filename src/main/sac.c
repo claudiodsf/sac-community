@@ -253,7 +253,12 @@ sac_command_line_copyright(int argc, char **argv) {
 
 #ifdef WIN32
 void
-sac_command_line_options(int *argc_p, char ***argv_p) {
+sac_command_line_options(int argc, char **argv) {
+  /* Command line options are handled by the Windows front end; keep the
+     signature identical to the POSIX implementation so that the shared
+     prototype and the call in sac_initialize() stay valid. */
+  (void) argc;
+  (void) argv;
   return;
 }
 #else

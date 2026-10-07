@@ -9,6 +9,7 @@ using namespace Gdiplus;
 #include "sac_resource.h"
 #include "WinSacView.h"
 #include "config.h"
+#include "mach.h"       /* MCMSG */
 
 extern "C" {
     #include "debug.h"
@@ -22,6 +23,11 @@ extern "C" {
     char *   ImageToBounds(SacImage *im, SacRect bounds);
     unsigned int sleep(unsigned int seconds);
     void     sac_command_line_copyright(int argc, char **argv);
+
+    /* C code declared in inc/co.h */
+    void     zgimsg(int argc, char **argv, char *mess, int messlen);
+    /* C code defined in src/main/sac.c; declared there and in src/osx/stubs.c */
+    void     execute_command_line(char *kmsg, int len);
 
     void     SacViewWindowsAdd(SacViewWindows *wins, SacView *view);
     SacView *SacViewWindowsGetByHandle(SacViewWindows *wins, HWND handle);
@@ -37,7 +43,6 @@ extern "C" {
     SacView * SacWindow      (int id);
     void      SacWindowAdd   (int id);
     int       use_tty        ();
-    int snprintf(char *str, size_t size, const char *format, ...);
     SacViewWindows *wins = NULL;
 }
 
@@ -176,7 +181,9 @@ WinMain(HINSTANCE hInstance,
     wc.hIcon         = LoadIcon(NULL,IDI_WINLOGO);
     wc.hCursor       = LoadCursor(NULL,IDC_ARROW);
     wc.hbrBackground = (HBRUSH)COLOR_WINDOWFRAME;
-    wc.lpszMenuName  = MAKEINTRESOURCE(SAC_MENU);
+    /* No menu bar.  WNDCLASS is not zero-initialised on this path, so this has
+     * to be set explicitly rather than left out. */
+    wc.lpszMenuName  = NULL;
     wc.lpszClassName = Application;
     
     if (!RegisterClass(&wc))
@@ -190,12 +197,48 @@ WinMain(HINSTANCE hInstance,
         freopen("CONOUT$", "w", stderr); 
     }
 #else
+/* MinGW's <stdlib.h> defines __argc and __argv as function-like macros, which
+ * would mangle the parameter names below into bogus function pointer types.
+ * MSVC exposes them as globals instead, hence the guard. */
+#ifdef __MINGW32__
+#undef __argc
+#undef __argv
+#endif
 int
 main(int __argc, char **__argv) {
   MSG msg;
+
+  /* The console entry point needs the same one-time GDI+ initialisation and
+   * plot window class registration that the WinMain() path performs; without
+   * it SacWindow()'s CreateWindow() has no class to create a window from. */
+  {
+    WNDCLASS wc;
+    GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR           gdiplusToken;
+
+    GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL);
+
+    memset(&wc, 0, sizeof(wc));
+    wc.style         = CS_HREDRAW | CS_VREDRAW;
+    wc.lpfnWndProc   = WindowProc;
+    wc.hInstance     = GetModuleHandle(NULL);
+    wc.hIcon         = LoadIcon(NULL, IDI_WINLOGO);
+    wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)COLOR_WINDOWFRAME;
+    wc.lpszMenuName  = NULL;
+    wc.lpszClassName = Application;
+
+    if (!RegisterClass(&wc)) {
+      fprintf(stderr, "sac: could not register the plot window class\n");
+    }
+  }
 #endif
 
+#ifdef _MSC_VER
+  /* MSVC-only CRT tweak: print exponents with at least two digits.  The
+   * symbol no longer exists in the modern Universal CRT. */
   _set_output_format(_TWO_DIGIT_EXPONENT);
+#endif
   sac_command_line_copyright(__argc, __argv);
 
   main_thread = GetCurrentThreadId();
@@ -204,6 +247,20 @@ main(int __argc, char **__argv) {
 
     /* Initialize SAC */
     win_init();
+
+    /* Run a macro or command given on the command line, the way the X11 and
+     * macOS entry points do with zgimsg() and execute_command_line().  Without
+     * this, arguments are silently ignored on Windows. */
+    if (__argc > 1) {
+        char kmsg[MCMSG + 1];
+
+        memset(&(kmsg[0]), ' ', MCMSG);
+        kmsg[0] = '\0';
+        kmsg[MCMSG] = '\0';
+
+        zgimsg(__argc, __argv, kmsg, MCMSG + 1);
+        execute_command_line(kmsg, MCMSG + 1);
+    }
 
     /* Put Console on its own Thread */
     CreateThread(NULL, 0, ConsoleIO, NULL, 0, &ThreadId);
@@ -250,16 +307,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
     SacView *view;
     switch (msg) {
-    case WM_COMMAND:
-        switch(LOWORD(wparam)) {
-        case ID_FILE_EXIT:
-            fprintf(stderr, "File Exit\n");
-            break;
-        case ID_STUFF_GO:
-            fprintf(stderr, "Stuff Go\n");
-            break;
-        }
-        break;
     case WM_PAINT:
         view = SacViewWindowsGetByHandle(wins, hwnd);
         if(view) {

@@ -196,12 +196,12 @@ win_stroke() {
 }
 
 void
-win_draw(float x, float y) {
+win_draw(double x, double y) {
     SacViewAdd(current_view, SV_Line, MakePoint(x, y));
 }
 
 void
-win_draw_poly(float *x, float *y, int n) {
+win_draw_poly(double *x, double *y, int n) {
     int i;
     SacPoint *p;
     p = (SacPoint *) malloc(sizeof(SacPoint) * n);
@@ -212,7 +212,7 @@ win_draw_poly(float *x, float *y, int n) {
 }
 
 void
-win_move(float x, float y) {
+win_move(double x, double y) {
     SacViewAdd(current_view, SV_Move, MakePoint(x, y));
 }
 

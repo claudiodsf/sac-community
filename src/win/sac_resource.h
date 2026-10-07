@@ -1,7 +1,7 @@
 
-#define SAC_MENU 101
+/* Reserved for an ICON resource.
+ *
+ * The plot windows have no menu bar, so the menu identifier and the command
+ * identifiers for its (inert) items are gone. */
 #define SAC_ICON 102
-
-#define ID_FILE_EXIT 9000
-#define ID_STUFF_GO  9001
 

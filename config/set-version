@@ -53,9 +53,6 @@ sync_file() {
 sync_file inc/config_win.h \
     "s/(#define PACKAGE_VERSION[[:space:]]+)\"[^\"]*\"/\\1\"$VERSION\"/"
 
-sync_file win/sac_win_installer.iss \
-    "s/(#define MyAppVersion )\"[^\"]*\"/\\1\"$VERSION\"/"
-
 sync_file sac_setup.iss \
     "s/(#define MyAppVersion )\"[^\"]*\"/\\1\"$VERSION\"/"
 

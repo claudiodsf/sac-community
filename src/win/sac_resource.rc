@@ -1,18 +1,9 @@
 
 #include "sac_resource.h"
 
-SAC_MENU MENU
-BEGIN
-    POPUP "&File"
-    BEGIN
-        MENUITEM "E&xit", ID_FILE_EXIT
-    END
-    
-    POPUP "&Stuff"
-    BEGIN
-        MENUITEM "&Go", ID_STUFF_GO
-        MENUITEM "G&o somewhere else", 0, GRAYED
-    END
-END
+/* The plot windows deliberately have no menu bar.  The File and Stuff menus
+ * that used to be defined here were inert placeholders -- their handlers only
+ * printed a line to stderr -- so they have been removed.  An ICON resource
+ * would go here if the executable is ever given one. */
 
 

@@ -35,3 +35,16 @@ venv
 
 AGENTS.md
 CLAUDE.md
+
+# CMake out-of-tree build directories and logs
+/build*/
+/cmake-*.log
+
+# Logs and scratch files from local build and test runs
+/*.log
+/sac-out.txt
+/o.txt
+/e.txt
+/err.txt
+/out.txt
+/stderr.txt
