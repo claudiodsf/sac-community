@@ -124,6 +124,7 @@ int
 main(int __argc, char **__argv) {
   MSG msg;
 
+
   /* The console entry point needs the same one-time GDI+ initialisation and
    * plot window class registration that the WinMain() path performs; without
    * it SacWindow()'s CreateWindow() has no class to create a window from. */

@@ -625,7 +625,11 @@ static void yy_reduce(
       yyRuleName[yyruleno], yymsp[-yysize].stateno);
   }
 #endif /* NDEBUG */
-  yygotominor = yyzerominor;
+  /* Zero the whole slot.  The generated `yygotominor = yyzerominor;` only
+   * initialises the union's first member (int yyinit), so the Token payload -
+   * including .next - kept whatever the slot already held, and a rule that does
+   * not set .next spliced that stale value into a chain. */
+  memset(&yygotominor, 0, sizeof(yygotominor));
 
   switch( yyruleno ){
   /* Beginning here are the reduction cases.  A typical example

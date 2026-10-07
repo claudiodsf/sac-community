@@ -65,6 +65,11 @@ arg_reset() {
         token_free(tok0);
         tok0 = NULL;
     }
+    /* tok and tok_save pointed into the chain that has just been released;
+     * leaving them set meant the next arg_append()/arg_next() walked (or
+     * wrote through) freed memory. */
+    tok = NULL;
+    tok_save = NULL;
 }
 
 void

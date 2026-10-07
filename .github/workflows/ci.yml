@@ -176,13 +176,9 @@ jobs:
           - name: windows-x86_64
             runs-on: windows-latest
             msystem: UCRT64
-            # This configuration hangs in a handful of tests.  The reference
-            # platforms run all but eight of the 192 tests in under two seconds
-            # (see SAC_SLOW_TESTS in CMakeLists.txt), so a short budget reports
-            # every failure within seconds and still leaves the plotting tests
-            # plenty of room.
-            test_timeout: 20
-            test_timeout_slow: 120
+            test_timeout: 600
+            test_timeout_slow: 600
+            build_type: Release
             packages: >-
               git
               mingw-w64-ucrt-x86_64-gcc
@@ -199,6 +195,7 @@ jobs:
             experimental: true
             test_timeout: 600
             test_timeout_slow: 600
+            build_type: Release
             packages: >-
               git
               mingw-w64-clang-aarch64-clang
@@ -220,7 +217,7 @@ jobs:
       - name: Configure
         shell: msys2 {0}
         run: >-
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.platform.build_type }}
           -DSAC_TEST_TIMEOUT=${{ matrix.platform.test_timeout }}
           -DSAC_TEST_TIMEOUT_SLOW=${{ matrix.platform.test_timeout_slow }}
       - name: Build

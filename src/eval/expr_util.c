@@ -242,6 +242,8 @@ header_to_token(char *str, Token * t, int col) {
     int id, icat, item, ok;
     sac *s;
     ok = 0;
+    /* Fill-in function: see the note in token_var(). */
+    memset(t, 0, sizeof(*t));
     memset(val, ' ', 41);
     memset(key, 0, sizeof(key));
     val[40] = 0;
@@ -479,6 +481,7 @@ macro_variable_no_value(char *k) {
 
     p = upcase_dup(k);
 
+
     memset(msg, 0, sizeof(msg));
     asprintf(&prmt, "%s?  $", k);
     zgpmsg(prmt, 0, msg, 4095);
@@ -506,6 +509,12 @@ token_var(Token * a, int type, char *key, int col) {
     char *k, *p, c;
     var *v;
     int retval;
+
+    /* Fill-in function: the caller may hand us an uninitialised Token, and the
+     * helpers used below (token_value/token_string/token_int) deliberately do
+     * not touch .next, so it would keep stack garbage.  Later token_last()
+     * would then walk that garbage. */
+    memset(a, 0, sizeof(*a));
 
     switch (type) {
         case BLACKBOARD:
@@ -652,7 +661,7 @@ replace(char *t, char k) {
                 }
                 break;
             case '%':{
-                    Token a;
+                    Token a = { 0 };
                     char *tmp;
                     rstrip(&key[0]);
                     if (!token_var(&a, BLACKBOARD, strdup(key), 0)) {
@@ -664,7 +673,7 @@ replace(char *t, char k) {
                 }
                 break;
             case '&':{
-                    Token a;
+                    Token a = { 0 };
                     char *tmp;
                     rstrip(key);
                     if (!header_to_token(key, &a, 0)) {
@@ -814,7 +823,10 @@ void
 token_copy(Token * a, Token * b) {
     a->type = b->type;
     a->value = b->value;
-    a->str = b->str;
+    /* Take our own copy of the string.  Sharing the pointer meant
+     * token_free() could release a buffer another chain still owned - a double
+     * free that surfaced as a fault in token_to_line()/token_last(). */
+    a->str = b->str ? strdup(b->str) : NULL;
     a->next = b->next;
     a->line = b->line;
     a->col = b->col;
@@ -883,7 +895,12 @@ token_remove(Token * head, Token * t) {
         last->next = t->next;
     }
     t->next = NULL;
-    token_free(t);
+    /* Unlink only -- do not token_free(t) here.  Callers may still hold this
+     * node (arg_save()/arg_restore(), a token_copy() of the chain, tok in
+     * saccommands.c), and token_free() also releases ->str, which
+     * token_copy()/token_dup() share rather than duplicate.  Freeing it left
+     * dangling nodes inside live chains and could double-free the shared
+     * string. */
     return head;
 }
 
@@ -1009,9 +1026,12 @@ token_dup(Token * t) {
     Token *p;
     p = token_new(0, 0, NULL, 0, 0);
     token_copy(p, t);
-    if (p->str) {
-        p->str = strdup(p->str);
-    }
+    /* token_copy() also copies .next, which would mount this single-node copy
+     * into the *source* chain.  Callers that want a chain walk it themselves
+     * (token_deep_copy() relinks every node), and the ones that want one node
+     * used to have to patch .next back to NULL by hand.  Terminate it here.
+     * token_copy() now duplicates the string, so no second strdup is needed. */
+    p->next = NULL;
     return p;
 }
 

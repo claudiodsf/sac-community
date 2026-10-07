@@ -1221,7 +1221,11 @@ static void yy_reduce(
       yyRuleName[yyruleno], yymsp[-yysize].stateno);
   }
 #endif /* NDEBUG */
-  yygotominor = yyzerominor;
+  /* Zero the whole slot.  The generated `yygotominor = yyzerominor;` only
+   * initialises the union's first member (int yyinit), so the Token payload -
+   * including .next - kept whatever the slot already held, and a rule that does
+   * not set .next spliced that stale value into a chain. */
+  memset(&yygotominor, 0, sizeof(yygotominor));
 
   switch( yyruleno ){
   /* Beginning here are the reduction cases.  A typical example
@@ -1240,7 +1244,14 @@ static void yy_reduce(
     token_copy(value, &yymsp[0].minor.yy0);
   } 
 }
-#line 1244 "expr_parse_noop.c"
+#line 1248 "expr_parse_noop.c"
+        break;
+      case 1: /* pin ::= */
+      case 22: /* evaloptsp ::= */ yytestcase(yyruleno==22);
+      case 72: /* commas ::= */ yytestcase(yyruleno==72);
+#line 96 "expr_parse_noop.y"
+{ memset(&yygotominor.yy0, 0, sizeof(yygotominor.yy0)); }
+#line 1255 "expr_parse_noop.c"
         break;
       case 2: /* pin ::= pbits_list */
       case 4: /* pbits_list ::= pbits */ yytestcase(yyruleno==4);
@@ -1256,34 +1267,34 @@ static void yy_reduce(
       case 17: /* pbits ::= NE */ yytestcase(yyruleno==17);
       case 18: /* pbits ::= COMMA */ yytestcase(yyruleno==18);
       case 19: /* pbits ::= WILD */ yytestcase(yyruleno==19);
-#line 90 "expr_parse_noop.y"
+#line 97 "expr_parse_noop.y"
 { token_copy(&yygotominor.yy0,&yymsp[0].minor.yy0);      }
-#line 1262 "expr_parse_noop.c"
-        break;
-      case 3: /* pin ::= pbits_list NEWLINE */
-#line 91 "expr_parse_noop.y"
-{ token_copy(&yygotominor.yy0,&yymsp[-1].minor.yy0);        yy_destructor(yypParser,9,&yymsp[0].minor);
-}
-#line 1268 "expr_parse_noop.c"
-        break;
-      case 5: /* pbits_list ::= pbits_list pbits */
-#line 94 "expr_parse_noop.y"
-{ token_append(&yygotominor.yy0,&yymsp[-1].minor.yy0,&yymsp[0].minor.yy0);  }
 #line 1273 "expr_parse_noop.c"
         break;
-      case 6: /* pbits ::= number */
-#line 96 "expr_parse_noop.y"
-{ token_copy(&yygotominor.yy0,&yymsp[0].minor.yy0);     }
-#line 1278 "expr_parse_noop.c"
-        break;
-      case 10: /* pbits ::= LPAREN expr RPAREN */
-#line 100 "expr_parse_noop.y"
-{ yymsp[-1].minor.yy0.col = yymsp[-2].minor.yy0.col; token_copy(&yygotominor.yy0,&yymsp[-1].minor.yy0);        yy_destructor(yypParser,1,&yymsp[0].minor);
+      case 3: /* pin ::= pbits_list NEWLINE */
+#line 98 "expr_parse_noop.y"
+{ token_copy(&yygotominor.yy0,&yymsp[-1].minor.yy0);        yy_destructor(yypParser,9,&yymsp[0].minor);
 }
+#line 1279 "expr_parse_noop.c"
+        break;
+      case 5: /* pbits_list ::= pbits_list pbits */
+#line 101 "expr_parse_noop.y"
+{ token_append(&yygotominor.yy0,&yymsp[-1].minor.yy0,&yymsp[0].minor.yy0);  }
 #line 1284 "expr_parse_noop.c"
         break;
+      case 6: /* pbits ::= number */
+#line 103 "expr_parse_noop.y"
+{ token_copy(&yygotominor.yy0,&yymsp[0].minor.yy0);     }
+#line 1289 "expr_parse_noop.c"
+        break;
+      case 10: /* pbits ::= LPAREN expr RPAREN */
+#line 107 "expr_parse_noop.y"
+{ yymsp[-1].minor.yy0.col = yymsp[-2].minor.yy0.col; token_copy(&yygotominor.yy0,&yymsp[-1].minor.yy0);        yy_destructor(yypParser,1,&yymsp[0].minor);
+}
+#line 1295 "expr_parse_noop.c"
+        break;
       case 20: /* pin ::= evaluate */
-#line 111 "expr_parse_noop.y"
+#line 118 "expr_parse_noop.y"
 { 
 
   Token *tmp;
@@ -1296,14 +1307,23 @@ static void yy_reduce(
       setbb(eval_out, VAR_INTEGER, (int)tmp->value);
     }
   } else {
-    yygotominor.yy0.next = tmp;
+    /* Append a *copy* of the last token instead of aliasing it: chains that
+       shared this tail node were mutated by a later append into another
+       chain, which closed a cycle and made token_last() loop forever. */
+    Token *last_tok = token_new(0, 0, NULL, 0, 0);
+    token_copy(last_tok, tmp);
+    if (last_tok->str) {
+      last_tok->str = strdup(last_tok->str);
+    }
+    last_tok->next = NULL;
+    yygotominor.yy0.next = last_tok;
   }
   eval_asfloat = 1;
 }
-#line 1304 "expr_parse_noop.c"
+#line 1324 "expr_parse_noop.c"
         break;
       case 21: /* evaluate ::= EVALUATE evaloptsp expr */
-#line 127 "expr_parse_noop.y"
+#line 143 "expr_parse_noop.y"
 { 
     Token *p;
     yymsp[-2].minor.yy0.type = STRING; 
@@ -1322,12 +1342,12 @@ static void yy_reduce(
     token_copy(p, &yymsp[0].minor.yy0);
     token_last(&yygotominor.yy0)->next = p;
 }
-#line 1326 "expr_parse_noop.c"
+#line 1346 "expr_parse_noop.c"
         break;
       case 23: /* evaloptsp ::= evalopts */
-#line 146 "expr_parse_noop.y"
+#line 162 "expr_parse_noop.y"
 { token_copy(&yygotominor.yy0,&yymsp[0].minor.yy0);  }
-#line 1331 "expr_parse_noop.c"
+#line 1351 "expr_parse_noop.c"
         break;
       case 24: /* evalopts ::= evalo */
       case 34: /* number ::= blackboard */ yytestcase(yyruleno==34);
@@ -1337,17 +1357,17 @@ static void yy_reduce(
       case 77: /* list_item ::= number */ yytestcase(yyruleno==77);
       case 79: /* xlist ::= list_item */ yytestcase(yyruleno==79);
       case 96: /* expr ::= fstring */ yytestcase(yyruleno==96);
-#line 147 "expr_parse_noop.y"
+#line 163 "expr_parse_noop.y"
 { token_copy(&yygotominor.yy0,&yymsp[0].minor.yy0); }
-#line 1343 "expr_parse_noop.c"
+#line 1363 "expr_parse_noop.c"
         break;
       case 25: /* evalopts ::= evalopts evalo */
-#line 148 "expr_parse_noop.y"
+#line 164 "expr_parse_noop.y"
 { token_append(&yygotominor.yy0,&yymsp[-1].minor.yy0,&yymsp[0].minor.yy0); }
-#line 1348 "expr_parse_noop.c"
+#line 1368 "expr_parse_noop.c"
         break;
       case 26: /* evalo ::= TO STRING */
-#line 149 "expr_parse_noop.y"
+#line 165 "expr_parse_noop.y"
 { 
    if(eval_out) {
      free(eval_out); 
@@ -1357,60 +1377,60 @@ static void yy_reduce(
    yymsp[-1].minor.yy0.type = STRING;
    token_append(&yygotominor.yy0,&yymsp[-1].minor.yy0,&yymsp[0].minor.yy0);
 }
-#line 1361 "expr_parse_noop.c"
+#line 1381 "expr_parse_noop.c"
         break;
       case 27: /* evalo ::= AS FLOAT */
-#line 158 "expr_parse_noop.y"
+#line 174 "expr_parse_noop.y"
 { eval_asfloat = 1; yymsp[-1].minor.yy0.type = yymsp[0].minor.yy0.type = STRING; token_append(&yygotominor.yy0,&yymsp[-1].minor.yy0,&yymsp[0].minor.yy0); }
-#line 1366 "expr_parse_noop.c"
+#line 1386 "expr_parse_noop.c"
         break;
       case 28: /* evalo ::= AS INTEGER */
-#line 159 "expr_parse_noop.y"
+#line 175 "expr_parse_noop.y"
 { eval_asfloat = 0;  yymsp[-1].minor.yy0.type = yymsp[0].minor.yy0.type = STRING; token_append(&yygotominor.yy0,&yymsp[-1].minor.yy0,&yymsp[0].minor.yy0); }
-#line 1371 "expr_parse_noop.c"
+#line 1391 "expr_parse_noop.c"
         break;
       case 29: /* pbits ::= DEBUG_PARSER */
-#line 166 "expr_parse_noop.y"
+#line 182 "expr_parse_noop.y"
 {
   if(!tdebug) {
     tdebug = 1;
-                  
-                                 
-      
-                
+                   
+                                  
+       
+                 
     ParseNoOpTrace(stdout, "expr: ");
-      
+       
   } else {
     tdebug = 0;
-                  
-                               
-      
-                
+                   
+                                
+       
+                 
     ParseNoOpTrace(NULL, "expr: ");
-      
+       
   }
   yy_destructor(yypParser,27,&yymsp[0].minor);
 }
-#line 1395 "expr_parse_noop.c"
+#line 1415 "expr_parse_noop.c"
         break;
       case 30: /* expr ::= state */
       case 31: /* number ::= NUM */ yytestcase(yyruleno==31);
-#line 187 "expr_parse_noop.y"
+#line 203 "expr_parse_noop.y"
 { token_copy(&yygotominor.yy0,&yymsp[0].minor.yy0);            }
-#line 1401 "expr_parse_noop.c"
+#line 1421 "expr_parse_noop.c"
         break;
       case 32: /* number ::= TOK_PI */
-#line 189 "expr_parse_noop.y"
+#line 205 "expr_parse_noop.y"
 { token_value(&yygotominor.yy0, M_PI, yymsp[0].minor.yy0.col);      }
-#line 1406 "expr_parse_noop.c"
+#line 1426 "expr_parse_noop.c"
         break;
       case 33: /* number ::= MINUS number */
-#line 191 "expr_parse_noop.y"
+#line 207 "expr_parse_noop.y"
 { token_value(&yygotominor.yy0, -yymsp[0].minor.yy0.value, yymsp[-1].minor.yy0.col);  }
-#line 1411 "expr_parse_noop.c"
+#line 1431 "expr_parse_noop.c"
         break;
       case 37: /* blackboard ::= BLACKBOARD */
-#line 196 "expr_parse_noop.y"
+#line 212 "expr_parse_noop.y"
 { 
   if(!token_var(&yygotominor.yy0, BLACKBOARD, yymsp[0].minor.yy0.str, yymsp[0].minor.yy0.col)) {
     parse_error(value, TOKEN_STATUS_ERROR_UNKNOWN_BLACKBOARD_VARIABLE);
@@ -1429,153 +1449,153 @@ static void yy_reduce(
     }
   }
 }
-#line 1433 "expr_parse_noop.c"
+#line 1453 "expr_parse_noop.c"
         break;
       case 38: /* header ::= HEADER */
-#line 214 "expr_parse_noop.y"
+#line 230 "expr_parse_noop.y"
 { 
   if(!token_var(&yygotominor.yy0, HEADER, yymsp[0].minor.yy0.str, yymsp[0].minor.yy0.col)) {
     parse_error(value, TOKEN_STATUS_ERROR_UNKNOWN_HEADER_VARIABLE);
     value->str = yymsp[0].minor.yy0.str;
   } 
 }
-#line 1443 "expr_parse_noop.c"
+#line 1463 "expr_parse_noop.c"
         break;
       case 39: /* key ::= VARIABLE */
-#line 220 "expr_parse_noop.y"
+#line 236 "expr_parse_noop.y"
 { 
   if(!token_var(&yygotominor.yy0, VARIABLE, yymsp[0].minor.yy0.str, yymsp[0].minor.yy0.col)) {
     parse_error(value, TOKEN_STATUS_ERROR_UNKNOWN_MACRO_VARIABLE);
     value->str = yymsp[0].minor.yy0.str;
   }
 }
-#line 1453 "expr_parse_noop.c"
+#line 1473 "expr_parse_noop.c"
         break;
       case 40: /* state ::= number */
-#line 227 "expr_parse_noop.y"
+#line 243 "expr_parse_noop.y"
 { token_copy(&yygotominor.yy0,&yymsp[0].minor.yy0);        }
-#line 1458 "expr_parse_noop.c"
+#line 1478 "expr_parse_noop.c"
         break;
       case 41: /* state ::= func */
-#line 228 "expr_parse_noop.y"
+#line 244 "expr_parse_noop.y"
 { token_copy(&yygotominor.yy0,&yymsp[0].minor.yy0);    }
-#line 1463 "expr_parse_noop.c"
+#line 1483 "expr_parse_noop.c"
         break;
       case 42: /* state ::= MINUS func */
-#line 229 "expr_parse_noop.y"
+#line 245 "expr_parse_noop.y"
 { token_value(&yygotominor.yy0,-yymsp[0].minor.yy0.value, yymsp[-1].minor.yy0.col);  }
-#line 1468 "expr_parse_noop.c"
+#line 1488 "expr_parse_noop.c"
         break;
       case 43: /* state ::= state PLUS state */
-#line 231 "expr_parse_noop.y"
+#line 247 "expr_parse_noop.y"
 { token_value(&yygotominor.yy0, yymsp[-2].minor.yy0.value + yymsp[0].minor.yy0.value, yymsp[-2].minor.yy0.col);   yy_destructor(yypParser,3,&yymsp[-1].minor);
 }
-#line 1474 "expr_parse_noop.c"
+#line 1494 "expr_parse_noop.c"
         break;
       case 44: /* state ::= state MINUS state */
-#line 232 "expr_parse_noop.y"
+#line 248 "expr_parse_noop.y"
 { token_value(&yygotominor.yy0, yymsp[-2].minor.yy0.value - yymsp[0].minor.yy0.value, yymsp[-2].minor.yy0.col);   yy_destructor(yypParser,4,&yymsp[-1].minor);
 }
-#line 1480 "expr_parse_noop.c"
+#line 1500 "expr_parse_noop.c"
         break;
       case 45: /* state ::= state TIMES state */
-#line 233 "expr_parse_noop.y"
+#line 249 "expr_parse_noop.y"
 { token_value(&yygotominor.yy0, yymsp[-2].minor.yy0.value * yymsp[0].minor.yy0.value, yymsp[-2].minor.yy0.col);   yy_destructor(yypParser,6,&yymsp[-1].minor);
-}
-#line 1486 "expr_parse_noop.c"
-        break;
-      case 46: /* state ::= LPAREN state RPAREN */
-#line 235 "expr_parse_noop.y"
-{ token_copy(&yygotominor.yy0,&yymsp[-1].minor.yy0);         yy_destructor(yypParser,2,&yymsp[-2].minor);
-  yy_destructor(yypParser,1,&yymsp[0].minor);
-}
-#line 1493 "expr_parse_noop.c"
-        break;
-      case 47: /* num_or_pstate ::= number */
-#line 237 "expr_parse_noop.y"
-{ token_copy(&yygotominor.yy0,&yymsp[0].minor.yy0);}
-#line 1498 "expr_parse_noop.c"
-        break;
-      case 48: /* num_or_pstate ::= LPAREN state RPAREN */
-      case 49: /* num_or_pstate ::= LPAREN sac_math RPAREN */ yytestcase(yyruleno==49);
-#line 238 "expr_parse_noop.y"
-{ token_copy(&yygotominor.yy0,&yymsp[-1].minor.yy0);  yy_destructor(yypParser,2,&yymsp[-2].minor);
-  yy_destructor(yypParser,1,&yymsp[0].minor);
 }
 #line 1506 "expr_parse_noop.c"
         break;
-      case 50: /* func ::= SIN num_or_pstate */
-#line 241 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, sin( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col);  }
-#line 1511 "expr_parse_noop.c"
+      case 46: /* state ::= LPAREN state RPAREN */
+#line 251 "expr_parse_noop.y"
+{ token_copy(&yygotominor.yy0,&yymsp[-1].minor.yy0);         yy_destructor(yypParser,2,&yymsp[-2].minor);
+  yy_destructor(yypParser,1,&yymsp[0].minor);
+}
+#line 1513 "expr_parse_noop.c"
         break;
-      case 51: /* func ::= COS num_or_pstate */
-#line 242 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, cos( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col);  }
-#line 1516 "expr_parse_noop.c"
+      case 47: /* num_or_pstate ::= number */
+#line 253 "expr_parse_noop.y"
+{ token_copy(&yygotominor.yy0,&yymsp[0].minor.yy0);}
+#line 1518 "expr_parse_noop.c"
         break;
-      case 52: /* func ::= TAN num_or_pstate */
-#line 243 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, tan( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col);  }
-#line 1521 "expr_parse_noop.c"
-        break;
-      case 53: /* func ::= SINH num_or_pstate */
-#line 245 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, sinh( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
+      case 48: /* num_or_pstate ::= LPAREN state RPAREN */
+      case 49: /* num_or_pstate ::= LPAREN sac_math RPAREN */ yytestcase(yyruleno==49);
+#line 254 "expr_parse_noop.y"
+{ token_copy(&yygotominor.yy0,&yymsp[-1].minor.yy0);  yy_destructor(yypParser,2,&yymsp[-2].minor);
+  yy_destructor(yypParser,1,&yymsp[0].minor);
+}
 #line 1526 "expr_parse_noop.c"
         break;
-      case 54: /* func ::= COSH num_or_pstate */
-#line 246 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, cosh( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
+      case 50: /* func ::= SIN num_or_pstate */
+#line 257 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, sin( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col);  }
 #line 1531 "expr_parse_noop.c"
         break;
-      case 55: /* func ::= TANH num_or_pstate */
-#line 247 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, tanh( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
+      case 51: /* func ::= COS num_or_pstate */
+#line 258 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, cos( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col);  }
 #line 1536 "expr_parse_noop.c"
         break;
-      case 56: /* func ::= ASIN num_or_pstate */
-#line 249 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, asin( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
+      case 52: /* func ::= TAN num_or_pstate */
+#line 259 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, tan( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col);  }
 #line 1541 "expr_parse_noop.c"
         break;
-      case 57: /* func ::= ACOS num_or_pstate */
-#line 250 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, acos( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
+      case 53: /* func ::= SINH num_or_pstate */
+#line 261 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, sinh( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
 #line 1546 "expr_parse_noop.c"
         break;
-      case 58: /* func ::= ATAN num_or_pstate */
-#line 251 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, atan( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
+      case 54: /* func ::= COSH num_or_pstate */
+#line 262 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, cosh( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
 #line 1551 "expr_parse_noop.c"
         break;
-      case 59: /* func ::= ABS num_or_pstate */
-#line 253 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, fabs(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col);   }
+      case 55: /* func ::= TANH num_or_pstate */
+#line 263 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, tanh( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
 #line 1556 "expr_parse_noop.c"
         break;
-      case 60: /* func ::= FLOOR num_or_pstate */
-#line 254 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, floor(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col);  }
+      case 56: /* func ::= ASIN num_or_pstate */
+#line 265 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, asin( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
 #line 1561 "expr_parse_noop.c"
         break;
-      case 61: /* func ::= CEIL num_or_pstate */
-#line 255 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, ceil(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col);   }
+      case 57: /* func ::= ACOS num_or_pstate */
+#line 266 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, acos( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
 #line 1566 "expr_parse_noop.c"
         break;
-      case 62: /* func ::= EXPON num_or_pstate */
-#line 256 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, exp(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col);    }
+      case 58: /* func ::= ATAN num_or_pstate */
+#line 267 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, atan( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); }
 #line 1571 "expr_parse_noop.c"
         break;
-      case 63: /* func ::= ROUND num_or_pstate */
-#line 257 "expr_parse_noop.y"
-{ token_value(&yygotominor.yy0, round(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col);  }
+      case 59: /* func ::= ABS num_or_pstate */
+#line 269 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, fabs(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col);   }
 #line 1576 "expr_parse_noop.c"
         break;
+      case 60: /* func ::= FLOOR num_or_pstate */
+#line 270 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, floor(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col);  }
+#line 1581 "expr_parse_noop.c"
+        break;
+      case 61: /* func ::= CEIL num_or_pstate */
+#line 271 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, ceil(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col);   }
+#line 1586 "expr_parse_noop.c"
+        break;
+      case 62: /* func ::= EXPON num_or_pstate */
+#line 272 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, exp(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col);    }
+#line 1591 "expr_parse_noop.c"
+        break;
+      case 63: /* func ::= ROUND num_or_pstate */
+#line 273 "expr_parse_noop.y"
+{ token_value(&yygotominor.yy0, round(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col);  }
+#line 1596 "expr_parse_noop.c"
+        break;
       case 64: /* state ::= state EXP state */
-#line 259 "expr_parse_noop.y"
+#line 275 "expr_parse_noop.y"
 { 
   if(yymsp[-2].minor.yy0.value < 0.0 && fabs(round(yymsp[0].minor.yy0.value) - yymsp[0].minor.yy0.value) >= 1e-15) {
     parse_error(value, TOKEN_STATUS_ERROR_NEGATIVE_FRACTION_POWER);
@@ -1584,31 +1604,31 @@ static void yy_reduce(
   }
   yy_destructor(yypParser,7,&yymsp[-1].minor);
 }
-#line 1588 "expr_parse_noop.c"
+#line 1608 "expr_parse_noop.c"
         break;
       case 65: /* func ::= ATAN2 LPAREN state COMMA state RPAREN */
-#line 267 "expr_parse_noop.y"
+#line 283 "expr_parse_noop.y"
 { 
   token_value(&yygotominor.yy0, atan2( yymsp[-3].minor.yy0.value, yymsp[-1].minor.yy0.value ), yymsp[-5].minor.yy0.col); 
   yy_destructor(yypParser,2,&yymsp[-4].minor);
   yy_destructor(yypParser,20,&yymsp[-2].minor);
   yy_destructor(yypParser,1,&yymsp[0].minor);
 }
-#line 1598 "expr_parse_noop.c"
+#line 1618 "expr_parse_noop.c"
         break;
       case 66: /* func ::= LENGTH LPAREN state COMMA state RPAREN */
-#line 270 "expr_parse_noop.y"
+#line 286 "expr_parse_noop.y"
 { 
   token_value(&yygotominor.yy0, sqrt( yymsp[-3].minor.yy0.value*yymsp[-3].minor.yy0.value + yymsp[-1].minor.yy0.value*yymsp[-1].minor.yy0.value ), yymsp[-5].minor.yy0.col); 
   yy_destructor(yypParser,2,&yymsp[-4].minor);
   yy_destructor(yypParser,20,&yymsp[-2].minor);
   yy_destructor(yypParser,1,&yymsp[0].minor);
 }
-#line 1608 "expr_parse_noop.c"
+#line 1628 "expr_parse_noop.c"
         break;
       case 67: /* func ::= LOGN num_or_pstate */
       case 94: /* func ::= ALOG num_or_pstate */ yytestcase(yyruleno==94);
-#line 273 "expr_parse_noop.y"
+#line 289 "expr_parse_noop.y"
 { 
   if(yymsp[0].minor.yy0.value > 0.0) {
     token_value(&yygotominor.yy0, log(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col); 
@@ -1616,10 +1636,10 @@ static void yy_reduce(
     parse_error(value, TOKEN_STATUS_ERROR_LOG_NEGATIVE);
   }
 }
-#line 1620 "expr_parse_noop.c"
+#line 1640 "expr_parse_noop.c"
         break;
       case 68: /* func ::= LOG10 num_or_pstate */
-#line 280 "expr_parse_noop.y"
+#line 296 "expr_parse_noop.y"
 { 
   if(yymsp[0].minor.yy0.value > 0.0) {
     token_value(&yygotominor.yy0, log10(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col); 
@@ -1627,10 +1647,10 @@ static void yy_reduce(
     parse_error(value, TOKEN_STATUS_ERROR_LOG_NEGATIVE);
   }
 }
-#line 1631 "expr_parse_noop.c"
+#line 1651 "expr_parse_noop.c"
         break;
       case 69: /* state ::= state DIVIDE state */
-#line 287 "expr_parse_noop.y"
+#line 303 "expr_parse_noop.y"
 { 
     if(yymsp[0].minor.yy0.value != 0.0) {
       token_value(&yygotominor.yy0, yymsp[-2].minor.yy0.value / yymsp[0].minor.yy0.value, yymsp[-2].minor.yy0.col);
@@ -1639,10 +1659,10 @@ static void yy_reduce(
     } 
     yy_destructor(yypParser,5,&yymsp[-1].minor);
 }
-#line 1643 "expr_parse_noop.c"
+#line 1663 "expr_parse_noop.c"
         break;
       case 70: /* func ::= SQRT num_or_pstate */
-#line 294 "expr_parse_noop.y"
+#line 310 "expr_parse_noop.y"
 { 
   if(yymsp[0].minor.yy0.value >= 0.0) {
     token_value(&yygotominor.yy0, sqrt ( yymsp[0].minor.yy0.value ), yymsp[-1].minor.yy0.col); 
@@ -1650,66 +1670,70 @@ static void yy_reduce(
     parse_error(value, TOKEN_STATUS_ERROR_SQRT_NEGATIVE);
   }
 }
-#line 1654 "expr_parse_noop.c"
+#line 1674 "expr_parse_noop.c"
         break;
       case 71: /* commas ::= COMMA */
-#line 303 "expr_parse_noop.y"
-{
-  yy_destructor(yypParser,20,&yymsp[0].minor);
+#line 319 "expr_parse_noop.y"
+{ memset(&yygotominor.yy0, 0, sizeof(yygotominor.yy0));   yy_destructor(yypParser,20,&yymsp[0].minor);
 }
-#line 1661 "expr_parse_noop.c"
+#line 1680 "expr_parse_noop.c"
         break;
       case 73: /* sac_math ::= MINIMUM xlist */
-#line 332 "expr_parse_noop.y"
+#line 348 "expr_parse_noop.y"
 {
   token_value(&yygotominor.yy0, token_foreach(&yymsp[0].minor.yy0, token_min), yymsp[-1].minor.yy0.col);
-  token_free(yymsp[0].minor.yy0.next);
+  /* Do not token_free(yymsp[0].minor.yy0.next) here.  token_append()/token_copy() copy the .next
+   * pointer rather than duplicating the chain, so the parent list still
+   * references exactly the block this would free: the next token_last() then
+   * walks freed memory.  yygotominor.yy0 normal heap usually leaves it mapped, which is why
+   * this only ever faulted on x86_64, and only with page heap; it is still the
+   * corruption behind the crashes and the endless walks. */
 }
-#line 1669 "expr_parse_noop.c"
+#line 1693 "expr_parse_noop.c"
         break;
       case 74: /* sac_math ::= MAXIMUM xlist */
-#line 340 "expr_parse_noop.y"
+#line 361 "expr_parse_noop.y"
 {
   token_value(&yygotominor.yy0, token_foreach(&yymsp[0].minor.yy0, token_max), yymsp[-1].minor.yy0.col);
-  token_free(yymsp[0].minor.yy0.next);
+  /* See the MINIMUM rule above: the chain is shared, so it must not be freed. */
 }
-#line 1677 "expr_parse_noop.c"
+#line 1701 "expr_parse_noop.c"
         break;
       case 75: /* state ::= LPAREN sac_math RPAREN */
       case 78: /* list_item ::= LPAREN expr RPAREN */ yytestcase(yyruleno==78);
-#line 346 "expr_parse_noop.y"
+#line 367 "expr_parse_noop.y"
 { token_copy(&yygotominor.yy0,&yymsp[-1].minor.yy0);   yy_destructor(yypParser,2,&yymsp[-2].minor);
   yy_destructor(yypParser,1,&yymsp[0].minor);
 }
-#line 1685 "expr_parse_noop.c"
+#line 1709 "expr_parse_noop.c"
         break;
       case 80: /* xlist ::= xlist commas list_item */
-#line 352 "expr_parse_noop.y"
+#line 373 "expr_parse_noop.y"
 { token_append(&yygotominor.yy0,&yymsp[-2].minor.yy0,&yymsp[0].minor.yy0); }
-#line 1690 "expr_parse_noop.c"
+#line 1714 "expr_parse_noop.c"
         break;
       case 81: /* sac_math ::= ADD xlist */
-#line 354 "expr_parse_noop.y"
+#line 375 "expr_parse_noop.y"
 {token_value(&yygotominor.yy0, token_foreach(&yymsp[0].minor.yy0, token_add), yymsp[-1].minor.yy0.col); }
-#line 1695 "expr_parse_noop.c"
+#line 1719 "expr_parse_noop.c"
         break;
       case 82: /* sac_math ::= SUB xlist */
-#line 355 "expr_parse_noop.y"
+#line 376 "expr_parse_noop.y"
 {token_value(&yygotominor.yy0, token_foreach(&yymsp[0].minor.yy0, token_sub), yymsp[-1].minor.yy0.col); }
-#line 1700 "expr_parse_noop.c"
+#line 1724 "expr_parse_noop.c"
         break;
       case 83: /* sac_math ::= MUL xlist */
-#line 356 "expr_parse_noop.y"
+#line 377 "expr_parse_noop.y"
 {token_value(&yygotominor.yy0, token_foreach(&yymsp[0].minor.yy0, token_mul), yymsp[-1].minor.yy0.col); }
-#line 1705 "expr_parse_noop.c"
+#line 1729 "expr_parse_noop.c"
         break;
       case 84: /* sac_math ::= DIV xlist */
-#line 357 "expr_parse_noop.y"
+#line 378 "expr_parse_noop.y"
 {token_value(&yygotominor.yy0, token_foreach(&yymsp[0].minor.yy0, token_div), yymsp[-1].minor.yy0.col); }
-#line 1710 "expr_parse_noop.c"
+#line 1734 "expr_parse_noop.c"
         break;
       case 85: /* sac_math ::= GETTIME MINIMUM */
-#line 359 "expr_parse_noop.y"
+#line 380 "expr_parse_noop.y"
 { 
   if(!gettime_expr(&yygotominor.yy0, NULL, FALSE, FALSE)) {
     parse_error(value, TOKEN_STATUS_ERROR_GETTIME);
@@ -1718,10 +1742,10 @@ static void yy_reduce(
   }
   yy_destructor(yypParser,51,&yymsp[0].minor);
 }
-#line 1722 "expr_parse_noop.c"
+#line 1746 "expr_parse_noop.c"
         break;
       case 86: /* sac_math ::= GETTIME */
-#line 366 "expr_parse_noop.y"
+#line 387 "expr_parse_noop.y"
 { 
   if(!gettime_expr(&yygotominor.yy0, NULL, FALSE, FALSE)) {
     parse_error(value, TOKEN_STATUS_ERROR_GETTIME);
@@ -1729,10 +1753,10 @@ static void yy_reduce(
     yygotominor.yy0.col = yymsp[0].minor.yy0.col;
   }
 }
-#line 1733 "expr_parse_noop.c"
+#line 1757 "expr_parse_noop.c"
         break;
       case 87: /* sac_math ::= GETTIME MAXIMUM */
-#line 373 "expr_parse_noop.y"
+#line 394 "expr_parse_noop.y"
 { 
   if(!gettime_expr(&yygotominor.yy0, NULL, TRUE, FALSE)) {
     parse_error(value, TOKEN_STATUS_ERROR_GETTIME);
@@ -1741,10 +1765,10 @@ static void yy_reduce(
   }
   yy_destructor(yypParser,52,&yymsp[0].minor);
 }
-#line 1745 "expr_parse_noop.c"
+#line 1769 "expr_parse_noop.c"
         break;
       case 88: /* sac_math ::= GETTIME MINIMUM state */
-#line 380 "expr_parse_noop.y"
+#line 401 "expr_parse_noop.y"
 { 
   if(!gettime_expr(&yygotominor.yy0, &yymsp[0].minor.yy0, FALSE, TRUE)) {
     parse_error(value, TOKEN_STATUS_ERROR_GETTIME);
@@ -1753,10 +1777,10 @@ static void yy_reduce(
   }
   yy_destructor(yypParser,51,&yymsp[-1].minor);
 }
-#line 1757 "expr_parse_noop.c"
+#line 1781 "expr_parse_noop.c"
         break;
       case 89: /* sac_math ::= GETTIME MAXIMUM state */
-#line 387 "expr_parse_noop.y"
+#line 408 "expr_parse_noop.y"
 { 
   if(!gettime_expr(&yygotominor.yy0, &yymsp[0].minor.yy0, TRUE, TRUE)) {
     parse_error(value, TOKEN_STATUS_ERROR_GETTIME);
@@ -1765,10 +1789,10 @@ static void yy_reduce(
   }
   yy_destructor(yypParser,52,&yymsp[-1].minor);
 }
-#line 1769 "expr_parse_noop.c"
+#line 1793 "expr_parse_noop.c"
         break;
       case 90: /* sac_math ::= GETVAL XFILE num_or_pstate state */
-#line 394 "expr_parse_noop.y"
+#line 415 "expr_parse_noop.y"
 {
     if(!getval_expr(&yygotominor.yy0, &yymsp[0].minor.yy0, &yymsp[-1].minor.yy0, TRUE)) {
         parse_error(value, TOKEN_STATUS_ERROR_GETVAL);
@@ -1777,10 +1801,10 @@ static void yy_reduce(
     }
   yy_destructor(yypParser,59,&yymsp[-2].minor);
 }
-#line 1781 "expr_parse_noop.c"
+#line 1805 "expr_parse_noop.c"
         break;
       case 91: /* sac_math ::= GETVAL state */
-#line 401 "expr_parse_noop.y"
+#line 422 "expr_parse_noop.y"
 {
     if(!getval_expr(&yygotominor.yy0, &yymsp[0].minor.yy0, NULL, FALSE)) {
         parse_error(value, TOKEN_STATUS_ERROR_GETVAL);
@@ -1788,20 +1812,20 @@ static void yy_reduce(
         yygotominor.yy0.col = yymsp[-1].minor.yy0.col;
     }
 }
-#line 1792 "expr_parse_noop.c"
+#line 1816 "expr_parse_noop.c"
         break;
       case 92: /* func ::= INTEGER num_or_pstate */
-#line 409 "expr_parse_noop.y"
+#line 430 "expr_parse_noop.y"
 { token_value(&yygotominor.yy0, (int) yymsp[0].minor.yy0.value, yymsp[-1].minor.yy0.col);   }
-#line 1797 "expr_parse_noop.c"
+#line 1821 "expr_parse_noop.c"
         break;
       case 93: /* func ::= POWER num_or_pstate */
-#line 410 "expr_parse_noop.y"
+#line 431 "expr_parse_noop.y"
 { token_value(&yygotominor.yy0, pow(10,yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col); }
-#line 1802 "expr_parse_noop.c"
+#line 1826 "expr_parse_noop.c"
         break;
       case 95: /* func ::= ALOG10 num_or_pstate */
-#line 418 "expr_parse_noop.y"
+#line 439 "expr_parse_noop.y"
 { 
   if(yymsp[0].minor.yy0.value > 0.0) {
     token_value(&yygotominor.yy0,log10(yymsp[0].minor.yy0.value), yymsp[-1].minor.yy0.col); 
@@ -1809,17 +1833,17 @@ static void yy_reduce(
     parse_error(value, TOKEN_STATUS_ERROR_LOG_NEGATIVE);
   }
 }
-#line 1813 "expr_parse_noop.c"
+#line 1837 "expr_parse_noop.c"
         break;
       case 97: /* string ::= STRING */
       case 98: /* string ::= QUOTED_STRING */ yytestcase(yyruleno==98);
       case 99: /* string ::= ESCAPE_STRING */ yytestcase(yyruleno==99);
-#line 430 "expr_parse_noop.y"
+#line 451 "expr_parse_noop.y"
 { token_string(&yygotominor.yy0, yymsp[0].minor.yy0.str, yymsp[0].minor.yy0.col); }
-#line 1820 "expr_parse_noop.c"
+#line 1844 "expr_parse_noop.c"
         break;
       case 100: /* string ::= number */
-#line 433 "expr_parse_noop.y"
+#line 454 "expr_parse_noop.y"
 { 
   if(yymsp[0].minor.yy0.type == NUM) {
     char *s;
@@ -1833,15 +1857,15 @@ static void yy_reduce(
     token_string(&yygotominor.yy0, yymsp[0].minor.yy0.str, yymsp[0].minor.yy0.col);
   }
 }
-#line 1837 "expr_parse_noop.c"
+#line 1861 "expr_parse_noop.c"
         break;
       case 101: /* string_list ::= */
-#line 448 "expr_parse_noop.y"
+#line 469 "expr_parse_noop.y"
 { token_string(&yygotominor.yy0, strdup(""), lexer_col()); }
-#line 1842 "expr_parse_noop.c"
+#line 1866 "expr_parse_noop.c"
         break;
       case 102: /* string_list ::= string_list string */
-#line 449 "expr_parse_noop.y"
+#line 470 "expr_parse_noop.y"
 { 
   if(yymsp[-1].minor.yy0.str && yymsp[0].minor.yy0.str) {
     string *s = string_new(yymsp[-1].minor.yy0.str);
@@ -1854,17 +1878,17 @@ static void yy_reduce(
     parse_error(value, TOKEN_STATUS_ERROR_SYNTAX);
   }
 }
-#line 1858 "expr_parse_noop.c"
+#line 1882 "expr_parse_noop.c"
         break;
       case 103: /* string ::= LPAREN fstring RPAREN */
-#line 463 "expr_parse_noop.y"
+#line 484 "expr_parse_noop.y"
 {  token_copy(&yygotominor.yy0,&yymsp[-1].minor.yy0);   yy_destructor(yypParser,2,&yymsp[-2].minor);
   yy_destructor(yypParser,1,&yymsp[0].minor);
 }
-#line 1865 "expr_parse_noop.c"
+#line 1889 "expr_parse_noop.c"
         break;
       case 104: /* fstring ::= CHANGE string string string */
-#line 465 "expr_parse_noop.y"
+#line 486 "expr_parse_noop.y"
 {
   string *s = string_new( yymsp[0].minor.yy0.str );
   s = string_replace(s, yymsp[-2].minor.yy0.str, yymsp[-1].minor.yy0.str );
@@ -1873,10 +1897,10 @@ static void yy_reduce(
   FREE(yymsp[-2].minor.yy0.str);
   FREE(yymsp[-1].minor.yy0.str);
 }
-#line 1877 "expr_parse_noop.c"
+#line 1901 "expr_parse_noop.c"
         break;
       case 105: /* fstring ::= SUBSTRING number number string */
-#line 473 "expr_parse_noop.y"
+#line 494 "expr_parse_noop.y"
 {
   string *s = string_new(yymsp[0].minor.yy0.str);
   string *s2 = string_substr(s, (int)yymsp[-2].minor.yy0.value-1, (int)yymsp[-1].minor.yy0.value-(int)yymsp[-2].minor.yy0.value+1);
@@ -1885,10 +1909,10 @@ static void yy_reduce(
   string_free(&s2);
   FREE(yymsp[0].minor.yy0.str);
 }
-#line 1889 "expr_parse_noop.c"
+#line 1913 "expr_parse_noop.c"
         break;
       case 106: /* fstring ::= DELETE string string */
-#line 481 "expr_parse_noop.y"
+#line 502 "expr_parse_noop.y"
 {
   string *s = string_new(yymsp[0].minor.yy0.str);
   string_replace(s, yymsp[-1].minor.yy0.str, "");
@@ -1897,15 +1921,15 @@ static void yy_reduce(
   FREE(yymsp[-1].minor.yy0.str);
   FREE(yymsp[0].minor.yy0.str);
 }
-#line 1901 "expr_parse_noop.c"
+#line 1925 "expr_parse_noop.c"
         break;
       case 107: /* fstring ::= CONCAT string_list */
-#line 490 "expr_parse_noop.y"
+#line 511 "expr_parse_noop.y"
 { yymsp[0].minor.yy0.col = yymsp[-1].minor.yy0.col; token_copy(&yygotominor.yy0, &yymsp[0].minor.yy0); }
-#line 1906 "expr_parse_noop.c"
+#line 1930 "expr_parse_noop.c"
         break;
       case 108: /* fstring ::= BEFORE string string */
-#line 492 "expr_parse_noop.y"
+#line 513 "expr_parse_noop.y"
 {
   string *s = string_new(yymsp[0].minor.yy0.str);
   char *f = strstr(yymsp[0].minor.yy0.str, yymsp[-1].minor.yy0.str);
@@ -1915,10 +1939,10 @@ static void yy_reduce(
   FREE(yymsp[-1].minor.yy0.str);
   FREE(yymsp[0].minor.yy0.str);
 }
-#line 1919 "expr_parse_noop.c"
+#line 1943 "expr_parse_noop.c"
         break;
       case 109: /* fstring ::= AFTER string string */
-#line 501 "expr_parse_noop.y"
+#line 522 "expr_parse_noop.y"
 {
   string *s = string_new(yymsp[0].minor.yy0.str);
   char *f = strstr(yymsp[0].minor.yy0.str, yymsp[-1].minor.yy0.str);
@@ -1928,10 +1952,10 @@ static void yy_reduce(
   FREE(yymsp[-1].minor.yy0.str);
   FREE(yymsp[0].minor.yy0.str);
 }
-#line 1932 "expr_parse_noop.c"
+#line 1956 "expr_parse_noop.c"
         break;
       case 110: /* fstring ::= REPLY string */
-#line 510 "expr_parse_noop.y"
+#line 531 "expr_parse_noop.y"
 {
   char *a, *b, *def;
   char in[1024];
@@ -1966,25 +1990,22 @@ static void yy_reduce(
   }
   FREE(def);
 }
-#line 1970 "expr_parse_noop.c"
+#line 1994 "expr_parse_noop.c"
         break;
       case 111: /* fstring ::= FTOA state */
-#line 544 "expr_parse_noop.y"
+#line 565 "expr_parse_noop.y"
 { 
   char *s;
   asprintf(&s, "%g", yymsp[0].minor.yy0.value); 
   token_string(&yygotominor.yy0, s, yymsp[-1].minor.yy0.col);
 }
-#line 1979 "expr_parse_noop.c"
+#line 2003 "expr_parse_noop.c"
         break;
       default:
-      /* (1) pin ::= */ yytestcase(yyruleno==1);
-      /* (22) evaloptsp ::= */ yytestcase(yyruleno==22);
-      /* (72) commas ::= */ yytestcase(yyruleno==72);
         break;
 /********** End reduce actions ************************************************/
   };
-  assert( yyruleno>=0 && yyruleno<(int)(sizeof(yyRuleInfo)/sizeof(yyRuleInfo[0])) );
+  assert( yyruleno>=0 && yyruleno<sizeof(yyRuleInfo)/sizeof(yyRuleInfo[0]) );
   yygoto = yyRuleInfo[yyruleno].lhs;
   yysize = yyRuleInfo[yyruleno].nrhs;
   yypParser->yyidx -= yysize;
@@ -2031,7 +2052,7 @@ static void yy_parse_failed(
 #line 60 "expr_parse_noop.y"
 
   parse_error(value, TOKEN_STATUS_ERROR_SYNTAX);
-#line 2035 "expr_parse_noop.c"
+#line 2056 "expr_parse_noop.c"
 /************ End %parse_failure code *****************************************/
   ParseNoOpARG_STORE; /* Suppress warning about unused %extra_argument variable */
 }
@@ -2053,7 +2074,7 @@ static void yy_syntax_error(
   UNUSED(yymajor);
   UNUSED(yyminor);
   parse_error(value, TOKEN_STATUS_ERROR_SYNTAX);
-#line 2057 "expr_parse_noop.c"
+#line 2078 "expr_parse_noop.c"
 /************ End %syntax_error code ******************************************/
   ParseNoOpARG_STORE; /* Suppress warning about unused %extra_argument variable */
 }
@@ -2079,7 +2100,7 @@ static void yy_accept(
   if(value->error <= 0) {
     value->error = TOKEN_STATUS_OK;
   }
-#line 2083 "expr_parse_noop.c"
+#line 2104 "expr_parse_noop.c"
 /*********** End %parse_accept code *******************************************/
   ParseNoOpARG_STORE; /* Suppress warning about unused %extra_argument variable */
 }

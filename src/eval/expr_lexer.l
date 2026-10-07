@@ -484,9 +484,10 @@ token_set(Token *t, int type, double value, char *str, int line, int col) {
           t->str  = strdup(str);
       }
   }
-  if(type == NUM) {
-    t->value = value;
-  }
+  /* Set these unconditionally: callers copy whole Tokens around, so an unset
+   * field would leak stack contents into them. */
+  t->value = value;
+  t->error = TOKEN_STATUS_UNKNOWN;
 }
 
 static int no_op_order = 0;
@@ -504,6 +505,12 @@ parse(eval *e) {
   Token tok;
   Token *state;
   int val;
+
+  /* The parser can be handed this Token before token_set() fills it in, and
+   * token_set() does not set every field, so start from a known state.  Left
+   * uninitialised it contributed stack garbage (typically a return address) to
+   * Token.next, which token_to_line() and token_last() then walked. */
+  memset(&tok, 0, sizeof(tok));
 
   yylval.sval = NULL;
   lexer_reset();
@@ -634,9 +641,11 @@ eval_eval(eval *e) {
     }
   }
  error:  
-  if(out) {
-    token_free(out);
-  }
+  /* Do NOT token_free(out) here.  The parser result is a shallow view that
+   * aliases nodes belonging to other chains (token_copy() copies .next by
+   * design), so freeing it released nodes still reachable elsewhere - a double
+   * free that surfaced as faults inside token_to_line() and token_last().
+   * The leak is bounded by the number of evaluated expressions. */
   out = NULL;
 }
 

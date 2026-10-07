@@ -86,7 +86,14 @@ main       ::= pin(B).                     {
   } 
 }
 
-pin         ::= . 
+/* Lemon leaves $$ unassigned when a rule has no action, and the parser stack
+ * then still holds whatever the previous reduction left there.  The actions
+ * below test and copy these values (see the "if(D.type)" in evaluate()), so a
+ * stale slot means a garbage Token, and a garbage Token.next means the next
+ * token_last() walks into memory it does not own: on x86_64 that is a crash or
+ * an endless walk, while on arm64 the same slot happens to be zero.  Give the
+ * empty rules an explicitly zeroed value. */
+pin(A)      ::= .                          { memset(&A, 0, sizeof(A)); }
 pin(A)      ::= pbits_list(B).             { token_copy(&A,&B);      }
 pin(A)      ::= pbits_list(B) NEWLINE.     { token_copy(&A,&B);      }
 
@@ -120,7 +127,16 @@ pin(A)        ::= evaluate(B) .  {
       setbb(eval_out, VAR_INTEGER, (int)tmp->value);
     }
   } else {
-    A.next = tmp;
+    /* Append a *copy* of the last token instead of aliasing it: chains that
+       shared this tail node were mutated by a later append into another
+       chain, which closed a cycle and made token_last() loop forever. */
+    Token *last_tok = token_new(0, 0, NULL, 0, 0);
+    token_copy(last_tok, tmp);
+    if (last_tok->str) {
+      last_tok->str = strdup(last_tok->str);
+    }
+    last_tok->next = NULL;
+    A.next = last_tok;
   }
   eval_asfloat = 1;
 }
@@ -142,7 +158,7 @@ evaluate(A)  ::= EVALUATE(C) evaloptsp(D) expr(B) . {
     token_copy(p, &B);
     token_last(&A)->next = p;
 }
-evaloptsp    ::= .
+evaloptsp(A) ::= .                         { memset(&A, 0, sizeof(A)); }
 evaloptsp(A) ::= evalopts(B).           { token_copy(&A,&B);  }
 evalopts(A)  ::= evalo(B) .             { token_copy(&A,&B); }
 evalopts(A)  ::= evalopts(B) evalo(C) . { token_append(&A,&B,&C); }
@@ -300,8 +316,8 @@ func(A)    ::= SQRT(E) num_or_pstate(B) . {
 }
 
 /* Comma or not to Comma, that is the question */
-commas ::= COMMA .
-commas ::= .
+commas(A) ::= COMMA .                      { memset(&A, 0, sizeof(A)); }
+commas(A) ::= .                            { memset(&A, 0, sizeof(A)); }
 
 /* Minimum and Maximum Functions: max(,,,)  min(,,,) */
 /*
@@ -331,7 +347,12 @@ func(A) ::= MIN(E) list(B) RPAREN. {
    and constants */
 sac_math(A) ::= MINIMUM(E) xlist(B) . {
   token_value(&A, token_foreach(&B, token_min), E.col);
-  token_free(B.next);
+  /* Do not token_free(B.next) here.  token_append()/token_copy() copy the .next
+   * pointer rather than duplicating the chain, so the parent list still
+   * references exactly the block this would free: the next token_last() then
+   * walks freed memory.  A normal heap usually leaves it mapped, which is why
+   * this only ever faulted on x86_64, and only with page heap; it is still the
+   * corruption behind the crashes and the endless walks. */
 }
 /* max # # # without parens and optional commas, 
    limited to numbers, list math [sac_math], 
@@ -339,7 +360,7 @@ sac_math(A) ::= MINIMUM(E) xlist(B) . {
    and constants */
 sac_math(A) ::= MAXIMUM(E) xlist(B) . {
   token_value(&A, token_foreach(&B, token_max), E.col);
-  token_free(B.next);
+  /* See the MINIMUM rule above: the chain is shared, so it must not be freed. */
 }
 
 /* SAC Regular Arithmetic Functions ( ) */  
